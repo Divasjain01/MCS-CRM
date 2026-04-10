@@ -87,18 +87,8 @@ export const fetchProfile = async (
 
 export const signInWithPassword = async (payload: SignInPayload) => {
   ensureSupabaseConfigured();
-  const identifier = payload.identifier.trim();
-
-  if (identifier.includes("@")) {
-    return supabase.auth.signInWithPassword({
-      email: identifier.toLowerCase(),
-      password: payload.password,
-    });
-  }
-
-  const phone = identifier.replace(/[^\d+]/g, "");
   return supabase.auth.signInWithPassword({
-    phone,
+    email: payload.email.trim().toLowerCase(),
     password: payload.password,
   });
 };

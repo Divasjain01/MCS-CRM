@@ -12,7 +12,7 @@ export interface AuthProfile {
 }
 
 export interface SignInPayload {
-  identifier: string;
+  email: string;
   password: string;
 }
 

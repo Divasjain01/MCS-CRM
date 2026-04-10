@@ -157,8 +157,7 @@ export const createUserFromAdmin = async (
 ): Promise<void> => {
   const payload = {
     full_name: values.fullName.trim(),
-    email: values.email.trim().toLowerCase() || undefined,
-    phone: values.phone.trim() || undefined,
+    email: values.email.trim().toLowerCase(),
     password: values.password,
     role: values.role,
   };
@@ -173,5 +172,28 @@ export const createUserFromAdmin = async (
 
   if (data && typeof data === "object" && "error" in data && typeof data.error === "string") {
     throw new Error(data.error);
+  }
+
+  if (
+    values.phone.trim() &&
+    data &&
+    typeof data === "object" &&
+    "user" in data &&
+    data.user &&
+    typeof data.user === "object" &&
+    "id" in data.user &&
+    typeof data.user.id === "string"
+  ) {
+    const { error: profileError } = await supabase
+      .from("profiles")
+      .update({
+        phone: values.phone.trim().replace(/[\s()-]/g, ""),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", data.user.id);
+
+    if (profileError) {
+      throw profileError;
+    }
   }
 };

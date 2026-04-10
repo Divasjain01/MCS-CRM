@@ -71,35 +71,13 @@ const roleColors: Record<UserRole, string> = {
 const createUserSchema = z
   .object({
     fullName: z.string().trim().min(2, "Full name is required."),
-    email: z.string().trim(),
+    email: z.string().trim().email("Enter a valid email address."),
     phone: z.string().trim(),
     password: z.string().min(8, "Password must be at least 8 characters."),
     role: z.enum(["admin", "sales", "store_manager", "furniture_specialist"]),
   })
   .superRefine((values, context) => {
-    const hasEmail = values.email.length > 0;
     const hasPhone = values.phone.length > 0;
-
-    if (!hasEmail && !hasPhone) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Provide at least an email or phone number.",
-        path: ["email"],
-      });
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Provide at least an email or phone number.",
-        path: ["phone"],
-      });
-    }
-
-    if (hasEmail && !z.string().email().safeParse(values.email).success) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Enter a valid email address.",
-        path: ["email"],
-      });
-    }
 
     if (hasPhone && !/^\+?[0-9]{8,15}$/.test(values.phone.replace(/[\s()-]/g, ""))) {
       context.addIssue({
@@ -478,8 +456,8 @@ export default function AdminUsersPage() {
           <DialogHeader>
             <DialogTitle>Create User</DialogTitle>
             <DialogDescription>
-              Create an internal CRM user with email, phone, or both. They can log in using whichever
-              identifier you create for them.
+              Create an internal CRM user with email and password. Phone is stored as contact data
+              until phone-based auth is configured.
             </DialogDescription>
           </DialogHeader>
 
@@ -562,8 +540,8 @@ export default function AdminUsersPage() {
             </div>
 
             <div className="rounded-lg border p-3 text-sm text-muted-foreground">
-              If you provide only a phone and password, the user will log in with phone. If you provide
-              only an email and password, they will log in with email. Providing both lets either one work.
+              Users currently sign in with email and password. Phone is optional here and is saved on
+              their CRM profile for future phone-based auth setup.
             </div>
 
             <DialogFooter>
