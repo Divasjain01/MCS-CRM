@@ -1,5 +1,6 @@
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { appEnv, isSupabaseConfigured } from "@/config/env";
+import { buildInternalAuthEmail, isInternalAuthEmail } from "@/lib/auth-identifiers";
 import { supabase } from "@/lib/supabase";
 import type {
   AuthProfile,
@@ -36,7 +37,15 @@ const buildDisplayName = (user: SupabaseUser) => {
 
 export const buildFallbackProfile = (user: SupabaseUser): AuthProfile => ({
   id: user.id,
-  email: user.email ?? "",
+  email:
+    isInternalAuthEmail(user.email) &&
+    typeof user.user_metadata.login_uid === "string"
+      ? ""
+      : (user.email ?? ""),
+  loginUid:
+    typeof user.user_metadata.login_uid === "string"
+      ? user.user_metadata.login_uid
+      : null,
   fullName: buildDisplayName(user),
   role: user.user_metadata.role ?? "sales",
   isActive: true,
@@ -49,8 +58,17 @@ export const buildFallbackProfile = (user: SupabaseUser): AuthProfile => ({
 
 const mapProfile = (profile: ProfileRow): AuthProfile => ({
   id: profile.id,
-  email: profile.email ?? "",
-  fullName: profile.full_name ?? profile.email ?? profile.phone ?? "M Cube User",
+  email:
+    isInternalAuthEmail(profile.email) && profile.login_uid
+      ? ""
+      : (profile.email ?? ""),
+  loginUid: profile.login_uid,
+  fullName:
+    profile.full_name ??
+    profile.login_uid ??
+    profile.email ??
+    profile.phone ??
+    "M Cube User",
   role: profile.role,
   isActive: profile.is_active,
   phone: profile.phone,
@@ -65,7 +83,7 @@ export const fetchProfile = async (
   const { data, error } = await supabase
     .from("profiles")
     .select(
-      "id, email, full_name, role, is_active, avatar_url, phone, created_at, updated_at",
+      "id, email, login_uid, full_name, role, is_active, avatar_url, phone, created_at, updated_at",
     )
     .eq("id", user.id)
     .maybeSingle();
@@ -87,8 +105,17 @@ export const fetchProfile = async (
 
 export const signInWithPassword = async (payload: SignInPayload) => {
   ensureSupabaseConfigured();
+  const identifier = payload.identifier.trim();
+  const email = identifier.includes("@")
+    ? identifier.toLowerCase()
+    : buildInternalAuthEmail(identifier);
+
+  if (!email) {
+    throw new Error("Enter a valid email or user ID.");
+  }
+
   return supabase.auth.signInWithPassword({
-    email: payload.email.trim().toLowerCase(),
+    email,
     password: payload.password,
   });
 };

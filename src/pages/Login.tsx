@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowRight, Building2, Eye, EyeOff, Lock, Mail } from "lucide-react";
+import { ArrowRight, Building2, Eye, EyeOff, Lock, User } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -13,7 +13,7 @@ import { useAuth } from "@/context/AuthContext";
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -39,7 +39,7 @@ export default function LoginPage() {
 
     try {
       await signIn({
-        email: email.trim(),
+        identifier: identifier.trim(),
         password,
       });
       toast("Signed in successfully", {
@@ -141,16 +141,16 @@ export default function LoginPage() {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="identifier">Email Or User ID</Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  id="email"
-                  type="email"
-                  placeholder="name@mcubespaces.com"
+                  id="identifier"
+                  type="text"
+                  placeholder="contact@mcubespaces.com or arpan"
                   className="pl-10"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
+                  value={identifier}
+                  onChange={(event) => setIdentifier(event.target.value)}
                   required
                 />
               </div>

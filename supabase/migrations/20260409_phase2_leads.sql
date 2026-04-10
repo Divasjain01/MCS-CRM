@@ -124,6 +124,7 @@ end $$;
 create table if not exists public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
   email text,
+  login_uid text,
   full_name text,
   role public.user_role not null default 'sales',
   is_active boolean not null default true,
@@ -200,6 +201,7 @@ create index if not exists idx_leads_assigned_to on public.leads (assigned_to);
 create index if not exists idx_leads_stage on public.leads (stage);
 create index if not exists idx_leads_product_interest on public.leads (product_interest);
 create index if not exists idx_leads_next_follow_up_at on public.leads (next_follow_up_at);
+create index if not exists idx_profiles_login_uid on public.profiles (login_uid);
 create index if not exists idx_lead_activities_lead_id on public.lead_activities (lead_id, created_at desc);
 create index if not exists idx_follow_ups_lead_id on public.follow_ups (lead_id, due_at asc);
 create index if not exists idx_follow_ups_status on public.follow_ups (status, due_at asc);
@@ -464,6 +466,13 @@ drop column if exists utm_source,
 drop column if exists utm_medium,
 drop column if exists utm_campaign;
 
+alter table public.profiles
+add column if not exists login_uid text;
+
+create unique index if not exists idx_profiles_login_uid_unique
+on public.profiles (login_uid)
+where login_uid is not null;
+
 -- =========================================================
 -- PATCH: PHONE-AWARE PROFILES + SAFE POLICY HELPERS
 -- =========================================================
@@ -492,6 +501,14 @@ as $$
   );
 $$;
 
+create or replace function public.normalize_login_uid(raw_value text)
+returns text
+language sql
+immutable
+as $$
+  select nullif(regexp_replace(lower(coalesce(raw_value, '')), '[^a-z0-9]+', '', 'g'), '');
+$$;
+
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
@@ -502,6 +519,7 @@ begin
   insert into public.profiles (
     id,
     email,
+    login_uid,
     full_name,
     role,
     is_active,
@@ -510,6 +528,14 @@ begin
   values (
     new.id,
     new.email,
+    public.normalize_login_uid(
+      coalesce(
+        new.raw_user_meta_data->>'login_uid',
+        new.raw_user_meta_data->>'full_name',
+        new.raw_user_meta_data->>'name',
+        split_part(coalesce(new.email, new.phone, 'user'), '@', 1)
+      )
+    ),
     coalesce(
       new.raw_user_meta_data->>'full_name',
       new.raw_user_meta_data->>'name',
@@ -522,6 +548,7 @@ begin
   on conflict (id) do update
   set
     email = excluded.email,
+    login_uid = coalesce(public.profiles.login_uid, excluded.login_uid),
     phone = coalesce(excluded.phone, public.profiles.phone),
     full_name = coalesce(public.profiles.full_name, excluded.full_name);
 
@@ -590,3 +617,32 @@ set phone = u.phone
 from auth.users u
 where p.id = u.id
   and p.phone is distinct from u.phone;
+
+update public.profiles p
+set login_uid = public.normalize_login_uid(
+  coalesce(
+    u.raw_user_meta_data->>'login_uid',
+    candidate.normalized_name
+  )
+)
+from auth.users u
+left join (
+  select
+    id,
+    case
+      when count(*) over (
+        partition by public.normalize_login_uid(full_name)
+      ) = 1
+      then full_name
+      else null
+    end as normalized_name
+  from public.profiles
+  where role <> 'admin'
+    and full_name is not null
+) candidate on candidate.id = p.id
+where p.id = u.id
+  and p.login_uid is null
+  and (
+    u.raw_user_meta_data ? 'login_uid'
+    or candidate.normalized_name is not null
+  );

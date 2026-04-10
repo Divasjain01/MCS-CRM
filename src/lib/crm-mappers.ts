@@ -7,6 +7,7 @@ import type {
   LeadFormValues,
   UserSummary,
 } from "@/types/crm";
+import { isInternalAuthEmail } from "@/lib/auth-identifiers";
 import type { Database } from "@/types/database";
 
 type LeadRow = Database["public"]["Tables"]["leads"]["Row"];
@@ -53,8 +54,17 @@ const nullableNumber = (value: string) => {
 
 export const mapProfileRowToUserSummary = (profile: ProfileRow): UserSummary => ({
   id: profile.id,
-  fullName: profile.full_name ?? profile.email ?? profile.phone ?? "M Cube User",
-  email: profile.email ?? "",
+  fullName:
+    profile.full_name ??
+    profile.login_uid ??
+    profile.email ??
+    profile.phone ??
+    "M Cube User",
+  email:
+    isInternalAuthEmail(profile.email) && profile.login_uid
+      ? ""
+      : (profile.email ?? ""),
+  loginUid: profile.login_uid,
   phone: profile.phone,
   role: profile.role,
   isActive: profile.is_active,
