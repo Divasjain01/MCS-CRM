@@ -1,9 +1,13 @@
 import { useMemo, useState } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 import { motion } from "framer-motion";
 import {
   CheckCircle,
   Mail,
   MoreHorizontal,
+  Phone,
   Search,
   Shield,
   UserCog,
@@ -42,12 +46,13 @@ import { toast } from "@/components/ui/sonner";
 import { useAuth } from "@/context/AuthContext";
 import {
   useAssignedLeadCountsQuery,
+  useCreateUserMutation,
   useReassignLeadsForUserMutation,
   useUpdateUserActiveStatusMutation,
   useUpdateUserRoleMutation,
 } from "@/hooks/use-admin-users";
 import { useUsersQuery } from "@/hooks/use-users";
-import type { UserRole, UserSummary } from "@/types/crm";
+import type { CreateUserFormValues, UserRole, UserSummary } from "@/types/crm";
 
 const roleLabels: Record<UserRole, string> = {
   admin: "Administrator",
@@ -63,17 +68,74 @@ const roleColors: Record<UserRole, string> = {
   furniture_specialist: "bg-success/10 text-success",
 };
 
+const createUserSchema = z
+  .object({
+    fullName: z.string().trim().min(2, "Full name is required."),
+    email: z.string().trim(),
+    phone: z.string().trim(),
+    password: z.string().min(8, "Password must be at least 8 characters."),
+    role: z.enum(["admin", "sales", "store_manager", "furniture_specialist"]),
+  })
+  .superRefine((values, context) => {
+    const hasEmail = values.email.length > 0;
+    const hasPhone = values.phone.length > 0;
+
+    if (!hasEmail && !hasPhone) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Provide at least an email or phone number.",
+        path: ["email"],
+      });
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Provide at least an email or phone number.",
+        path: ["phone"],
+      });
+    }
+
+    if (hasEmail && !z.string().email().safeParse(values.email).success) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Enter a valid email address.",
+        path: ["email"],
+      });
+    }
+
+    if (hasPhone && !/^\+?[0-9]{8,15}$/.test(values.phone.replace(/[\s()-]/g, ""))) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Enter a valid phone number with country code when possible.",
+        path: ["phone"],
+      });
+    }
+  });
+
+const createUserDefaults: CreateUserFormValues = {
+  fullName: "",
+  email: "",
+  phone: "",
+  password: "",
+  role: "sales",
+};
+
 export default function AdminUsersPage() {
   const { authUser } = useAuth();
   const usersQuery = useUsersQuery();
   const countsQuery = useAssignedLeadCountsQuery();
+  const createUserMutation = useCreateUserMutation();
   const updateRoleMutation = useUpdateUserRoleMutation();
   const updateActiveMutation = useUpdateUserActiveStatusMutation();
   const reassignMutation = useReassignLeadsForUserMutation();
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [createUserOpen, setCreateUserOpen] = useState(false);
   const [reassignmentUser, setReassignmentUser] = useState<UserSummary | null>(null);
   const [targetUserId, setTargetUserId] = useState<string>("unassigned");
+
+  const createUserForm = useForm<CreateUserFormValues>({
+    resolver: zodResolver(createUserSchema),
+    defaultValues: createUserDefaults,
+  });
 
   const users = useMemo(() => usersQuery.data ?? [], [usersQuery.data]);
   const assignedLeadCounts = countsQuery.data ?? {};
@@ -158,6 +220,28 @@ export default function AdminUsersPage() {
     }
   };
 
+  const handleCreateUser = createUserForm.handleSubmit(async (values) => {
+    try {
+      await createUserMutation.mutateAsync({
+        fullName: values.fullName.trim(),
+        email: values.email.trim(),
+        phone: values.phone.replace(/[\s()-]/g, "").trim(),
+        password: values.password,
+        role: values.role,
+      });
+
+      toast("User created", {
+        description: "The account was created successfully and can now sign in.",
+      });
+      createUserForm.reset(createUserDefaults);
+      setCreateUserOpen(false);
+    } catch (error) {
+      toast("Unable to create user", {
+        description: error instanceof Error ? error.message : "Please try again.",
+      });
+    }
+  });
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -171,9 +255,9 @@ export default function AdminUsersPage() {
             Manage Supabase profile metadata, active access, and lead ownership.
           </p>
         </div>
-        <Button variant="outline" className="gap-2" disabled>
+        <Button variant="outline" className="gap-2" onClick={() => setCreateUserOpen(true)}>
           <Users className="h-4 w-4" />
-          Invite flow later
+          Create User
         </Button>
       </div>
 
@@ -378,6 +462,119 @@ export default function AdminUsersPage() {
               {reassignMutation.isPending ? "Reassigning..." : "Confirm Reassignment"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={createUserOpen}
+        onOpenChange={(open) => {
+          setCreateUserOpen(open);
+          if (!open) {
+            createUserForm.reset(createUserDefaults);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Create User</DialogTitle>
+            <DialogDescription>
+              Create an internal CRM user with email, phone, or both. They can log in using whichever
+              identifier you create for them.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleCreateUser} className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="create-user-full-name">Full name</Label>
+                <Input id="create-user-full-name" {...createUserForm.register("fullName")} />
+                <p className="text-xs text-destructive">
+                  {createUserForm.formState.errors.fullName?.message}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="create-user-email">Email</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="create-user-email"
+                    type="email"
+                    className="pl-10"
+                    placeholder="name@mcubespaces.com"
+                    {...createUserForm.register("email")}
+                  />
+                </div>
+                <p className="text-xs text-destructive">
+                  {createUserForm.formState.errors.email?.message}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="create-user-phone">Phone</Label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="create-user-phone"
+                    className="pl-10"
+                    placeholder="+919876543210"
+                    {...createUserForm.register("phone")}
+                  />
+                </div>
+                <p className="text-xs text-destructive">
+                  {createUserForm.formState.errors.phone?.message}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="create-user-password">Password</Label>
+                <Input
+                  id="create-user-password"
+                  type="password"
+                  placeholder="Minimum 8 characters"
+                  {...createUserForm.register("password")}
+                />
+                <p className="text-xs text-destructive">
+                  {createUserForm.formState.errors.password?.message}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Role</Label>
+                <Select
+                  value={createUserForm.watch("role")}
+                  onValueChange={(value) =>
+                    createUserForm.setValue("role", value as UserRole, { shouldDirty: true })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(roleLabels).map(([key, label]) => (
+                      <SelectItem key={key} value={key}>
+                        {label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="rounded-lg border p-3 text-sm text-muted-foreground">
+              If you provide only a phone and password, the user will log in with phone. If you provide
+              only an email and password, they will log in with email. Providing both lets either one work.
+            </div>
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setCreateUserOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={createUserMutation.isPending}>
+                {createUserMutation.isPending ? "Creating..." : "Create User"}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </motion.div>

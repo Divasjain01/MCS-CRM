@@ -2,11 +2,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import {
   countAssignedLeadsByUser,
+  createUserFromAdmin,
   reassignLeadsForUser,
   updateUserActiveStatus,
   updateUserRole,
 } from "@/services/users";
-import type { UserRole } from "@/types/crm";
+import type { CreateUserFormValues, UserRole } from "@/types/crm";
 
 export const useAssignedLeadCountsQuery = () =>
   useQuery({
@@ -56,6 +57,17 @@ export const useReassignLeadsForUserMutation = () => {
       void queryClient.invalidateQueries({ queryKey: ["user-lead-counts"] });
       void queryClient.invalidateQueries({ queryKey: queryKeys.leads });
       void queryClient.invalidateQueries({ queryKey: queryKeys.followUps });
+    },
+  });
+};
+
+export const useCreateUserMutation = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (values: CreateUserFormValues) => createUserFromAdmin(values),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.users });
     },
   });
 };

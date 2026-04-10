@@ -1,7 +1,8 @@
+import { appEnv } from "@/config/env";
 import { supabase } from "@/lib/supabase";
 import { mapProfileRowToUserSummary } from "@/lib/crm-mappers";
 import { logLeadActivity } from "@/services/leads";
-import type { UserRole, UserSummary } from "@/types/crm";
+import type { CreateUserFormValues, UserRole, UserSummary } from "@/types/crm";
 import type { Database } from "@/types/database";
 
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
@@ -149,4 +150,28 @@ export const reassignLeadsForUser = async ({
   );
 
   return leads.length;
+};
+
+export const createUserFromAdmin = async (
+  values: CreateUserFormValues,
+): Promise<void> => {
+  const payload = {
+    full_name: values.fullName.trim(),
+    email: values.email.trim().toLowerCase() || undefined,
+    phone: values.phone.trim() || undefined,
+    password: values.password,
+    role: values.role,
+  };
+
+  const { data, error } = await supabase.functions.invoke(appEnv.createUserFunctionName, {
+    body: payload,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  if (data && typeof data === "object" && "error" in data && typeof data.error === "string") {
+    throw new Error(data.error);
+  }
 };

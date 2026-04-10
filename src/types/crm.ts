@@ -23,6 +23,14 @@ export interface UserSummary {
   avatarUrl?: string | null;
 }
 
+export interface CreateUserFormValues {
+  fullName: string;
+  email: string;
+  phone: string;
+  password: string;
+  role: UserRole;
+}
+
 export interface ActivityMetadata {
   note?: string | null;
   due_at?: string | null;

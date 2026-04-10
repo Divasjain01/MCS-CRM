@@ -4,6 +4,8 @@ export const appEnv = {
   supabaseUrl: trim(import.meta.env.VITE_SUPABASE_URL),
   supabaseAnonKey: trim(import.meta.env.VITE_SUPABASE_ANON_KEY),
   appUrl: trim(import.meta.env.VITE_APP_URL) || window.location.origin,
+  createUserFunctionName:
+    trim(import.meta.env.VITE_SUPABASE_CREATE_USER_FUNCTION) || "rapid-endpoint",
 };
 
 export const isSupabaseConfigured =
