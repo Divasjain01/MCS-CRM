@@ -40,14 +40,20 @@ import {
 } from "@/hooks/use-leads";
 import { useUsersQuery } from "@/hooks/use-users";
 import { downloadCsv } from "@/lib/csv";
-import { leadTypeLabels, sourceLabels, stageLabels } from "@/lib/crm-config";
+import { getAssignableUsers } from "@/lib/access-control";
+import { leadStageOptions, leadTypeLabels, sourceLabels, stageLabels } from "@/lib/crm-config";
 import { exportLeadsToCsv } from "@/services/leads";
-import type { Lead, LeadFormValues } from "@/types/crm";
+import type { Lead, LeadFormValues, UserRole } from "@/types/crm";
 
 export default function LeadsPage() {
-  const { authUser } = useAuth();
+  const { authUser, profile } = useAuth();
   const usersQuery = useUsersQuery();
   const users = usersQuery.data ?? [];
+  const actorRole = (profile?.role as UserRole | undefined) ?? null;
+  const assignableUsers = useMemo(
+    () => getAssignableUsers(users, actorRole ?? undefined),
+    [actorRole, users],
+  );
   const leadsQuery = useLeadsQuery(users);
   const createLeadMutation = useCreateLeadMutation();
   const updateLeadMutation = useUpdateLeadMutation();
@@ -147,6 +153,7 @@ export default function LeadsPage() {
           leadId: editingLead.id,
           values,
           actorId: authUser?.id ?? null,
+          actorRole,
           users,
         });
         toast("Lead updated", {
@@ -156,6 +163,7 @@ export default function LeadsPage() {
         await createLeadMutation.mutateAsync({
           values,
           actorId: authUser?.id ?? null,
+          actorRole,
           users,
         });
         toast("Lead created", {
@@ -221,9 +229,9 @@ export default function LeadsPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Stages</SelectItem>
-            {Object.entries(stageLabels).map(([key, label]) => (
-              <SelectItem key={key} value={key}>
-                {label}
+            {leadStageOptions.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
               </SelectItem>
             ))}
           </SelectContent>
@@ -416,7 +424,7 @@ export default function LeadsPage() {
             setEditingLead(null);
           }
         }}
-        users={users}
+        assignableUsers={assignableUsers}
         isSubmitting={createLeadMutation.isPending || updateLeadMutation.isPending}
         onSubmit={handleSubmit}
       />

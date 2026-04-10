@@ -21,7 +21,6 @@ import type { Lead, LeadStage } from "@/types/crm";
 const stages: LeadStage[] = [
   "new",
   "attempting_contact",
-  "connected",
   "qualified",
   "visit_booked",
   "visit_done",
@@ -35,7 +34,6 @@ const stages: LeadStage[] = [
 const stageColors: Record<LeadStage, string> = {
   new: "bg-info",
   attempting_contact: "bg-warning",
-  connected: "bg-success",
   qualified: "bg-primary",
   visit_booked: "bg-purple-500",
   visit_done: "bg-indigo-500",
@@ -62,7 +60,8 @@ export default function PipelinePage() {
     });
 
     (leadsQuery.data ?? []).forEach((lead) => {
-      const effectiveStage = localOverrides[lead.id] ?? lead.stage;
+      const currentStage = localOverrides[lead.id] ?? lead.stage;
+      const effectiveStage = currentStage === "connected" ? "qualified" : currentStage;
       grouped[effectiveStage].push({ ...lead, stage: effectiveStage });
     });
 

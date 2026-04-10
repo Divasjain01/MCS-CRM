@@ -31,7 +31,7 @@ const buildDisplayName = (user: SupabaseUser) => {
     return metadataName.trim();
   }
 
-  return user.email?.split("@")[0] || "M Cube User";
+  return user.email?.split("@")[0] || user.phone || "M Cube User";
 };
 
 export const buildFallbackProfile = (user: SupabaseUser): AuthProfile => ({
@@ -40,6 +40,7 @@ export const buildFallbackProfile = (user: SupabaseUser): AuthProfile => ({
   fullName: buildDisplayName(user),
   role: user.user_metadata.role ?? "sales",
   isActive: true,
+  phone: user.phone ?? null,
   avatarUrl:
     typeof user.user_metadata.avatar_url === "string"
       ? user.user_metadata.avatar_url
@@ -49,9 +50,10 @@ export const buildFallbackProfile = (user: SupabaseUser): AuthProfile => ({
 const mapProfile = (profile: ProfileRow): AuthProfile => ({
   id: profile.id,
   email: profile.email ?? "",
-  fullName: profile.full_name ?? profile.email ?? "M Cube User",
+  fullName: profile.full_name ?? profile.email ?? profile.phone ?? "M Cube User",
   role: profile.role,
   isActive: profile.is_active,
+  phone: profile.phone,
   avatarUrl: profile.avatar_url,
 });
 
@@ -85,7 +87,20 @@ export const fetchProfile = async (
 
 export const signInWithPassword = async (payload: SignInPayload) => {
   ensureSupabaseConfigured();
-  return supabase.auth.signInWithPassword(payload);
+  const identifier = payload.identifier.trim();
+
+  if (identifier.includes("@")) {
+    return supabase.auth.signInWithPassword({
+      email: identifier.toLowerCase(),
+      password: payload.password,
+    });
+  }
+
+  const phone = identifier.replace(/[^\d+]/g, "");
+  return supabase.auth.signInWithPassword({
+    phone,
+    password: payload.password,
+  });
 };
 
 export const signOutUser = async () => {

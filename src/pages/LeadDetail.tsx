@@ -25,6 +25,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { FollowUpDialog } from "@/components/followups/FollowUpDialog";
 import { LeadFormDialog } from "@/components/leads/LeadFormDialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -38,6 +49,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/sonner";
 import { useAuth } from "@/context/AuthContext";
 import {
+  useClearLeadActivitiesMutation,
   useCompleteFollowUpMutation,
   useCreateFollowUpMutation,
   useLeadActivitiesQuery,
@@ -49,8 +61,10 @@ import {
   useUpdateLeadStageMutation,
 } from "@/hooks/use-leads";
 import { useUsersQuery } from "@/hooks/use-users";
+import { getAssignableUsers } from "@/lib/access-control";
 import {
   followUpStatusLabels,
+  leadStageOptions,
   leadTypeLabels,
   showroomVisitStatusLabels,
   stageLabels,
@@ -73,9 +87,14 @@ const activityIcons: Record<ActivityType, ElementType> = {
 
 export default function LeadDetailPage() {
   const { id } = useParams();
-  const { authUser } = useAuth();
+  const { authUser, profile, isAdmin } = useAuth();
   const usersQuery = useUsersQuery();
   const users = usersQuery.data ?? [];
+  const actorRole = profile?.role ?? null;
+  const assignableUsers = useMemo(
+    () => getAssignableUsers(users, actorRole ?? undefined),
+    [actorRole, users],
+  );
   const leadQuery = useLeadDetailQuery(id, users);
   const activitiesQuery = useLeadActivitiesQuery(id, users);
   const followUpsQuery = useLeadFollowUpsQuery(id, users);
@@ -83,6 +102,7 @@ export default function LeadDetailPage() {
   const updateStageMutation = useUpdateLeadStageMutation();
   const updateAssignmentMutation = useUpdateLeadAssignmentMutation();
   const updateNotesMutation = useUpdateLeadNotesMutation();
+  const clearActivitiesMutation = useClearLeadActivitiesMutation();
   const createFollowUpMutation = useCreateFollowUpMutation();
   const completeFollowUpMutation = useCompleteFollowUpMutation();
 
@@ -125,6 +145,7 @@ export default function LeadDetailPage() {
         leadId: lead.id,
         values,
         actorId: authUser?.id ?? null,
+        actorRole,
         users,
       });
       toast("Lead updated", {
@@ -169,12 +190,31 @@ export default function LeadDetailPage() {
         leadId: lead.id,
         assignedTo: assignedTo === "unassigned" ? null : assignedTo,
         actorId: authUser?.id ?? null,
+        actorRole,
+        users,
       });
       toast("Assignment updated", {
         description: "Lead ownership has been updated.",
       });
     } catch (error) {
       toast("Unable to update assignment", {
+        description: error instanceof Error ? error.message : "Please try again.",
+      });
+    }
+  };
+
+  const handleClearActivities = async () => {
+    if (!lead) {
+      return;
+    }
+
+    try {
+      await clearActivitiesMutation.mutateAsync({ leadId: lead.id });
+      toast("Activity timeline cleared", {
+        description: "All timeline entries for this lead were removed.",
+      });
+    } catch (error) {
+      toast("Unable to clear activity timeline", {
         description: error instanceof Error ? error.message : "Please try again.",
       });
     }
@@ -211,6 +251,7 @@ export default function LeadDetailPage() {
         leadId: lead.id,
         values,
         actorId: authUser?.id ?? null,
+        actorRole,
         users,
       });
       toast("Follow-up scheduled", {
@@ -422,8 +463,39 @@ export default function LeadDetailPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Activity Timeline</CardTitle>
-              <CardDescription>Recent interactions stored in Supabase</CardDescription>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <CardTitle className="text-lg">Activity Timeline</CardTitle>
+                  <CardDescription>Recent interactions stored in Supabase</CardDescription>
+                </div>
+                {isAdmin && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        Clear Timeline
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Clear this activity timeline?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This removes all timeline entries for the lead. Follow-ups and the lead
+                          record itself will remain unchanged.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => void handleClearActivities()}
+                          disabled={clearActivitiesMutation.isPending}
+                        >
+                          {clearActivitiesMutation.isPending ? "Clearing..." : "Clear timeline"}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               {activitiesQuery.isLoading ? (
@@ -447,6 +519,11 @@ export default function LeadDetailPage() {
                         </div>
                         <div className="flex-1 pb-4">
                           <p className="text-sm">{activity.description}</p>
+                          {activity.metadata?.note ? (
+                            <div className="mt-2 rounded-md bg-muted/60 px-3 py-2 text-sm text-muted-foreground">
+                              {activity.metadata.note}
+                            </div>
+                          ) : null}
                           <div className="mt-1 flex items-center gap-2">
                             <span className="text-xs text-muted-foreground">
                               {activity.createdByUser?.fullName ?? "System"} -{" "}
@@ -511,9 +588,9 @@ export default function LeadDetailPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.entries(stageLabels).map(([key, label]) => (
-                      <SelectItem key={key} value={key}>
-                        {label}
+                    {leadStageOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -530,9 +607,7 @@ export default function LeadDetailPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="unassigned">Unassigned</SelectItem>
-                    {users
-                      .filter((user) => user.isActive)
-                      .map((user) => (
+                    {assignableUsers.map((user) => (
                         <SelectItem key={user.id} value={user.id}>
                           {user.fullName}
                         </SelectItem>
@@ -686,7 +761,7 @@ export default function LeadDetailPage() {
         lead={lead}
         open={editDialogOpen}
         onOpenChange={setEditDialogOpen}
-        users={users}
+        assignableUsers={assignableUsers}
         isSubmitting={updateLeadMutation.isPending}
         onSubmit={handleEditSubmit}
       />
@@ -694,7 +769,7 @@ export default function LeadDetailPage() {
       <FollowUpDialog
         open={followUpDialogOpen}
         onOpenChange={setFollowUpDialogOpen}
-        users={users}
+        assignableUsers={assignableUsers}
         defaultAssignedTo={lead.assignedTo}
         isSubmitting={createFollowUpMutation.isPending}
         onSubmit={handleCreateFollowUp}

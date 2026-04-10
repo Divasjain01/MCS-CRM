@@ -8,10 +8,11 @@ export interface AuthProfile {
   role: UserRole;
   isActive: boolean;
   avatarUrl?: string | null;
+  phone?: string | null;
 }
 
 export interface SignInPayload {
-  email: string;
+  identifier: string;
   password: string;
 }
 

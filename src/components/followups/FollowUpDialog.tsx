@@ -38,7 +38,7 @@ const defaultValues: FollowUpFormValues = {
 interface FollowUpDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  users: UserSummary[];
+  assignableUsers: UserSummary[];
   defaultAssignedTo?: string | null;
   isSubmitting?: boolean;
   onSubmit: (values: FollowUpFormValues) => Promise<void>;
@@ -47,7 +47,7 @@ interface FollowUpDialogProps {
 export function FollowUpDialog({
   open,
   onOpenChange,
-  users,
+  assignableUsers,
   defaultAssignedTo,
   isSubmitting = false,
   onSubmit,
@@ -103,9 +103,7 @@ export function FollowUpDialog({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="unassigned">Unassigned</SelectItem>
-                {users
-                  .filter((user) => user.isActive)
-                  .map((user) => (
+                {assignableUsers.map((user) => (
                     <SelectItem key={user.id} value={user.id}>
                       {user.fullName}
                     </SelectItem>

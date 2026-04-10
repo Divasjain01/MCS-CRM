@@ -108,7 +108,7 @@ interface LeadFormDialogProps {
   lead?: Lead | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  users: UserSummary[];
+  assignableUsers: UserSummary[];
   isSubmitting?: boolean;
   onSubmit: (values: LeadFormValues) => Promise<void>;
 }
@@ -117,7 +117,7 @@ export function LeadFormDialog({
   lead,
   open,
   onOpenChange,
-  users,
+  assignableUsers,
   isSubmitting = false,
   onSubmit,
 }: LeadFormDialogProps) {
@@ -272,9 +272,7 @@ export function LeadFormDialog({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="unassigned">Unassigned</SelectItem>
-                  {users
-                    .filter((user) => user.isActive)
-                    .map((user) => (
+                  {assignableUsers.map((user) => (
                       <SelectItem key={user.id} value={user.id}>
                         {user.fullName}
                       </SelectItem>

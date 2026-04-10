@@ -1,4 +1,5 @@
 import type {
+  ActivityMetadata,
   FollowUp,
   FollowUpFormValues,
   Lead,
@@ -52,8 +53,9 @@ const nullableNumber = (value: string) => {
 
 export const mapProfileRowToUserSummary = (profile: ProfileRow): UserSummary => ({
   id: profile.id,
-  fullName: profile.full_name ?? profile.email ?? "M Cube User",
+  fullName: profile.full_name ?? profile.email ?? profile.phone ?? "M Cube User",
   email: profile.email ?? "",
+  phone: profile.phone,
   role: profile.role,
   isActive: profile.is_active,
   avatarUrl: profile.avatar_url,
@@ -72,7 +74,7 @@ export const mapLeadRowToLead = (
   leadType: row.lead_type,
   source: row.source,
   sourceDetail: row.source_detail,
-  stage: row.stage,
+  stage: row.stage === "connected" ? "qualified" : row.stage,
   assignedTo: row.assigned_to,
   assignedUser: assignedUser ?? null,
   projectLocation: row.project_location,
@@ -102,6 +104,10 @@ export const mapLeadActivityRowToActivity = (
   leadId: row.lead_id,
   type: row.type,
   description: row.description,
+  metadata:
+    row.metadata && typeof row.metadata === "object" && !Array.isArray(row.metadata)
+      ? (row.metadata as ActivityMetadata)
+      : null,
   createdAt: row.created_at,
   createdBy: row.created_by,
   createdByUser: createdByUser ?? null,

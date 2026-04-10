@@ -19,7 +19,7 @@ export const stageLabels: Record<LeadStage, string> = {
   negotiation: "Negotiation",
   won: "Won",
   lost: "Lost",
-  dormant: "Dormant",
+  dormant: "Closed",
 };
 
 export const sourceLabels: Record<LeadSource, string> = {
@@ -77,10 +77,12 @@ export const followUpStatusLabels: Record<FollowUpStatus, string> = {
   cancelled: "Cancelled",
 };
 
-export const leadStageOptions = Object.entries(stageLabels).map(([value, label]) => ({
-  value: value as LeadStage,
-  label,
-}));
+export const leadStageOptions = Object.entries(stageLabels)
+  .filter(([value]) => value !== "connected")
+  .map(([value, label]) => ({
+    value: value as LeadStage,
+    label,
+  }));
 
 export const leadSourceOptions = Object.entries(sourceLabels).map(([value, label]) => ({
   value: value as LeadSource,

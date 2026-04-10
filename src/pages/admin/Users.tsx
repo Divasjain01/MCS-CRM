@@ -84,7 +84,8 @@ export default function AdminUsersPage() {
         const query = searchQuery.toLowerCase();
         return (
           user.fullName.toLowerCase().includes(query) ||
-          user.email.toLowerCase().includes(query)
+          user.email.toLowerCase().includes(query) ||
+          (user.phone ?? "").includes(searchQuery)
         );
       }),
     [searchQuery, users],
@@ -229,7 +230,9 @@ export default function AdminUsersPage() {
                         </Avatar>
                         <div>
                           <p className="text-sm font-medium">{user.fullName}</p>
-                          <p className="text-xs text-muted-foreground">{user.email}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {user.email || user.phone || "No email or phone"}
+                          </p>
                         </div>
                       </div>
                     </td>

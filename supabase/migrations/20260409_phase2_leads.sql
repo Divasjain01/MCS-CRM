@@ -463,3 +463,130 @@ alter table public.leads
 drop column if exists utm_source,
 drop column if exists utm_medium,
 drop column if exists utm_campaign;
+
+-- =========================================================
+-- PATCH: PHONE-AWARE PROFILES + SAFE POLICY HELPERS
+-- =========================================================
+
+create or replace function public.set_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+create or replace function public.is_admin(_user_id uuid)
+returns boolean
+language sql
+stable
+as $$
+  select exists (
+    select 1
+    from public.profiles p
+    where p.id = _user_id
+      and p.role = 'admin'
+      and p.is_active = true
+  );
+$$;
+
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.profiles (
+    id,
+    email,
+    full_name,
+    role,
+    is_active,
+    phone
+  )
+  values (
+    new.id,
+    new.email,
+    coalesce(
+      new.raw_user_meta_data->>'full_name',
+      new.raw_user_meta_data->>'name',
+      split_part(coalesce(new.email, new.phone, 'user'), '@', 1)
+    ),
+    coalesce((new.raw_user_meta_data->>'role')::public.user_role, 'sales'),
+    true,
+    new.phone
+  )
+  on conflict (id) do update
+  set
+    email = excluded.email,
+    phone = coalesce(excluded.phone, public.profiles.phone),
+    full_name = coalesce(public.profiles.full_name, excluded.full_name);
+
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_profiles_updated_at on public.profiles;
+create trigger trg_profiles_updated_at
+before update on public.profiles
+for each row
+execute function public.set_updated_at();
+
+drop trigger if exists trg_leads_updated_at on public.leads;
+create trigger trg_leads_updated_at
+before update on public.leads
+for each row
+execute function public.set_updated_at();
+
+drop trigger if exists trg_follow_ups_updated_at on public.follow_ups;
+create trigger trg_follow_ups_updated_at
+before update on public.follow_ups
+for each row
+execute function public.set_updated_at();
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+after insert on auth.users
+for each row
+execute function public.handle_new_user();
+
+drop policy if exists "profiles readable by authenticated users" on public.profiles;
+drop policy if exists "admins manage profiles" on public.profiles;
+drop policy if exists "profiles_select_authenticated" on public.profiles;
+drop policy if exists "profiles_update_self_or_admin" on public.profiles;
+drop policy if exists "profiles_insert_admin_only" on public.profiles;
+
+create policy "profiles_select_authenticated"
+on public.profiles
+for select
+to authenticated
+using (true);
+
+create policy "profiles_update_self_or_admin"
+on public.profiles
+for update
+to authenticated
+using (auth.uid() = id or public.is_admin(auth.uid()))
+with check (auth.uid() = id or public.is_admin(auth.uid()));
+
+create policy "profiles_insert_admin_only"
+on public.profiles
+for insert
+to authenticated
+with check (public.is_admin(auth.uid()));
+
+drop policy if exists "lead_activities_delete_admin_only" on public.lead_activities;
+create policy "lead_activities_delete_admin_only"
+on public.lead_activities
+for delete
+to authenticated
+using (public.is_admin(auth.uid()));
+
+update public.profiles p
+set phone = u.phone
+from auth.users u
+where p.id = u.id
+  and p.phone is distinct from u.phone;

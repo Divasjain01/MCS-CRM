@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import {
+  clearLeadActivities,
   createLead,
   importLeadsBatch,
   getLeadById,
@@ -21,6 +22,7 @@ import type {
   FollowUpFormValues,
   LeadFormValues,
   LeadStage,
+  UserRole,
   UserSummary,
 } from "@/types/crm";
 import type { Database } from "@/types/database";
@@ -77,12 +79,14 @@ export const useCreateLeadMutation = () => {
     mutationFn: ({
       values,
       actorId,
+      actorRole,
       users,
     }: {
       values: LeadFormValues;
       actorId: string | null;
+      actorRole: UserRole | null;
       users: UserSummary[];
-    }) => createLead(values, actorId, users),
+    }) => createLead(values, actorId, actorRole, users),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.leads });
       void queryClient.invalidateQueries({ queryKey: queryKeys.followUps });
@@ -118,13 +122,15 @@ export const useUpdateLeadMutation = () => {
       leadId,
       values,
       actorId,
+      actorRole,
       users,
     }: {
       leadId: string;
       values: LeadFormValues;
       actorId: string | null;
+      actorRole: UserRole | null;
       users: UserSummary[];
-    }) => updateLead(leadId, values, actorId, users),
+    }) => updateLead(leadId, values, actorId, actorRole, users),
     onSuccess: (_lead, variables) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.leads });
       void queryClient.invalidateQueries({ queryKey: queryKeys.lead(variables.leadId) });
@@ -172,11 +178,15 @@ export const useUpdateLeadAssignmentMutation = () => {
       leadId,
       assignedTo,
       actorId,
+      actorRole,
+      users,
     }: {
       leadId: string;
       assignedTo: string | null;
       actorId: string | null;
-    }) => updateLeadAssignment(leadId, assignedTo, actorId),
+      actorRole: UserRole | null;
+      users: UserSummary[];
+    }) => updateLeadAssignment(leadId, assignedTo, actorId, actorRole, users),
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.leads });
       void queryClient.invalidateQueries({ queryKey: queryKeys.lead(variables.leadId) });
@@ -224,13 +234,15 @@ export const useCreateFollowUpMutation = () => {
       leadId,
       values,
       actorId,
+      actorRole,
       users,
     }: {
       leadId: string;
       values: FollowUpFormValues;
       actorId: string | null;
+      actorRole: UserRole | null;
       users: UserSummary[];
-    }) => createFollowUp(leadId, values, actorId, users),
+    }) => createFollowUp(leadId, values, actorId, actorRole, users),
     onSuccess: (_followUp, variables) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.leads });
       void queryClient.invalidateQueries({ queryKey: queryKeys.lead(variables.leadId) });
@@ -242,6 +254,19 @@ export const useCreateFollowUpMutation = () => {
       });
       void queryClient.invalidateQueries({ queryKey: queryKeys.followUps });
       void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
+    },
+  });
+};
+
+export const useClearLeadActivitiesMutation = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ leadId }: { leadId: string }) => clearLeadActivities(leadId),
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.leadActivities(variables.leadId),
+      });
     },
   });
 };

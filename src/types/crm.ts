@@ -17,9 +17,23 @@ export interface UserSummary {
   id: string;
   fullName: string;
   email: string;
+  phone?: string | null;
   role: UserRole;
   isActive: boolean;
   avatarUrl?: string | null;
+}
+
+export interface ActivityMetadata {
+  note?: string | null;
+  due_at?: string | null;
+  assigned_to?: string | null;
+  previous_assigned_to?: string | null;
+  stage?: string | null;
+  previous_stage?: string | null;
+  follow_up_id?: string | null;
+  completed_at?: string | null;
+  import?: boolean | null;
+  [key: string]: string | number | boolean | null | undefined;
 }
 
 export type LeadStage =
@@ -131,6 +145,7 @@ export interface LeadActivity {
   leadId: string;
   type: ActivityType;
   description: string;
+  metadata?: ActivityMetadata | null;
   createdAt: string;
   createdBy: string | null;
   createdByUser?: UserSummary | null;

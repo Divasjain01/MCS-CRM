@@ -20,6 +20,7 @@ import type {
   LeadFormValues,
   LeadImportResult,
   LeadStage,
+  UserRole,
   UserSummary,
 } from "@/types/crm";
 import type { Database, Json } from "@/types/database";
@@ -58,6 +59,30 @@ export const logLeadActivity = async (
 
 const buildAssignedLookup = (users: UserSummary[]) =>
   new Map(users.map((user) => [user.id, user] as const));
+
+const assertAssignableUser = (
+  assignedTo: string | null | undefined,
+  actorRole: UserRole | null,
+  users: UserSummary[],
+) => {
+  if (!assignedTo) {
+    return;
+  }
+
+  const assignee = users.find((user) => user.id === assignedTo);
+
+  if (!assignee) {
+    throw new Error("The selected assignee could not be found.");
+  }
+
+  if (!assignee.isActive) {
+    throw new Error("The selected assignee is inactive.");
+  }
+
+  if (actorRole === "sales" && assignee.role !== "sales") {
+    throw new Error("Sales users can only assign leads to active sales profiles.");
+  }
+};
 
 export const listLeads = async (users: UserSummary[] = []): Promise<Lead[]> => {
   const { data, error } = await supabase
@@ -100,9 +125,11 @@ export const getLeadById = async (
 export const createLead = async (
   values: LeadFormValues,
   actorId: string | null,
+  actorRole: UserRole | null,
   users: UserSummary[] = [],
 ): Promise<Lead> => {
   const payload = mapLeadFormValuesToInsert(values, actorId);
+  assertAssignableUser(payload.assigned_to, actorRole, users);
   const { data, error } = await supabase
     .from("leads")
     .insert(payload)
@@ -148,6 +175,7 @@ export const updateLead = async (
   leadId: string,
   values: LeadFormValues,
   actorId: string | null,
+  actorRole: UserRole | null,
   users: UserSummary[] = [],
 ): Promise<Lead> => {
   const previousLead = await getLeadById(leadId, users);
@@ -155,6 +183,7 @@ export const updateLead = async (
     ...mapLeadFormValuesToUpdate(values),
     updated_at: new Date().toISOString(),
   };
+  assertAssignableUser(payload.assigned_to, actorRole, users);
 
   const { data, error } = await supabase
     .from("leads")
@@ -263,7 +292,10 @@ export const updateLeadAssignment = async (
   leadId: string,
   assignedTo: string | null,
   actorId: string | null,
+  actorRole: UserRole | null,
+  users: UserSummary[] = [],
 ): Promise<void> => {
+  assertAssignableUser(assignedTo, actorRole, users);
   const { error } = await supabase
     .from("leads")
     .update({
@@ -310,6 +342,14 @@ export const updateLeadNotes = async (
   }
 
   await logLeadActivity(leadId, "note_added", "Lead notes updated", actorId);
+};
+
+export const clearLeadActivities = async (leadId: string): Promise<void> => {
+  const { error } = await supabase.from("lead_activities").delete().eq("lead_id", leadId);
+
+  if (error) {
+    throw formatSupabaseError(error);
+  }
 };
 
 export const importLeadsBatch = async (

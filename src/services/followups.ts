@@ -1,13 +1,37 @@
 import { mapFollowUpFormValuesToInsert, mapFollowUpRowToFollowUp } from "@/lib/crm-mappers";
 import { logLeadActivity } from "@/services/leads";
 import { supabase } from "@/lib/supabase";
-import type { FollowUp, FollowUpFormValues, UserSummary } from "@/types/crm";
+import type { FollowUp, FollowUpFormValues, UserRole, UserSummary } from "@/types/crm";
 import type { Database } from "@/types/database";
 
 type FollowUpRow = Database["public"]["Tables"]["follow_ups"]["Row"];
 
 const buildUserLookup = (users: UserSummary[]) =>
   new Map(users.map((user) => [user.id, user] as const));
+
+const assertAssignableFollowUpUser = (
+  assignedTo: string | null | undefined,
+  actorRole: UserRole | null,
+  users: UserSummary[],
+) => {
+  if (!assignedTo) {
+    return;
+  }
+
+  const assignee = users.find((user) => user.id === assignedTo);
+
+  if (!assignee) {
+    throw new Error("The selected follow-up assignee could not be found.");
+  }
+
+  if (!assignee.isActive) {
+    throw new Error("The selected follow-up assignee is inactive.");
+  }
+
+  if (actorRole === "sales" && assignee.role !== "sales") {
+    throw new Error("Sales users can only assign follow-ups to active sales profiles.");
+  }
+};
 
 const syncLeadNextFollowUpAt = async (leadId: string) => {
   const { data, error } = await supabase
@@ -87,9 +111,11 @@ export const createFollowUp = async (
   leadId: string,
   values: FollowUpFormValues,
   actorId: string | null,
+  actorRole: UserRole | null,
   users: UserSummary[] = [],
 ): Promise<FollowUp> => {
   const payload = mapFollowUpFormValuesToInsert(values, leadId, actorId);
+  assertAssignableFollowUpUser(payload.assigned_to, actorRole, users);
   const { data, error } = await supabase
     .from("follow_ups")
     .insert(payload)
