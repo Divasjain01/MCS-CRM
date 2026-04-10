@@ -55,6 +55,7 @@ export const mapProfileRowToUserSummary = (profile: ProfileRow): UserSummary => 
   id: profile.id,
   fullName: profile.full_name ?? profile.email ?? profile.phone ?? "M Cube User",
   email: profile.email ?? "",
+  loginUid: profile.login_uid,
   phone: profile.phone,
   role: profile.role,
   isActive: profile.is_active,

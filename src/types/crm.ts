@@ -17,6 +17,7 @@ export interface UserSummary {
   id: string;
   fullName: string;
   email: string;
+  loginUid?: string | null;
   phone?: string | null;
   role: UserRole;
   isActive: boolean;
@@ -25,6 +26,7 @@ export interface UserSummary {
 
 export interface CreateUserFormValues {
   fullName: string;
+  loginUid: string;
   email: string;
   phone: string;
   password: string;

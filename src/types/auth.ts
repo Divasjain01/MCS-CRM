@@ -4,6 +4,7 @@ import type { UserRole } from "@/types/crm";
 export interface AuthProfile {
   id: string;
   email: string;
+  loginUid?: string | null;
   fullName: string;
   role: UserRole;
   isActive: boolean;
@@ -12,7 +13,7 @@ export interface AuthProfile {
 }
 
 export interface SignInPayload {
-  email: string;
+  identifier: string;
   password: string;
 }
 

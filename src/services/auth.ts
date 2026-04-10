@@ -1,5 +1,6 @@
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { appEnv, isSupabaseConfigured } from "@/config/env";
+import { normalizeLoginId } from "@/lib/auth-identifiers";
 import { supabase } from "@/lib/supabase";
 import type {
   AuthProfile,
@@ -37,6 +38,10 @@ const buildDisplayName = (user: SupabaseUser) => {
 export const buildFallbackProfile = (user: SupabaseUser): AuthProfile => ({
   id: user.id,
   email: user.email ?? "",
+  loginUid:
+    typeof user.user_metadata.login_uid === "string"
+      ? user.user_metadata.login_uid
+      : null,
   fullName: buildDisplayName(user),
   role: user.user_metadata.role ?? "sales",
   isActive: true,
@@ -50,6 +55,7 @@ export const buildFallbackProfile = (user: SupabaseUser): AuthProfile => ({
 const mapProfile = (profile: ProfileRow): AuthProfile => ({
   id: profile.id,
   email: profile.email ?? "",
+  loginUid: profile.login_uid,
   fullName: profile.full_name ?? profile.email ?? profile.phone ?? "M Cube User",
   role: profile.role,
   isActive: profile.is_active,
@@ -65,7 +71,7 @@ export const fetchProfile = async (
   const { data, error } = await supabase
     .from("profiles")
     .select(
-      "id, email, full_name, role, is_active, avatar_url, phone, created_at, updated_at",
+      "id, email, login_uid, full_name, role, is_active, avatar_url, phone, created_at, updated_at",
     )
     .eq("id", user.id)
     .maybeSingle();
@@ -87,8 +93,38 @@ export const fetchProfile = async (
 
 export const signInWithPassword = async (payload: SignInPayload) => {
   ensureSupabaseConfigured();
+  const identifier = payload.identifier.trim();
+
+  if (!identifier) {
+    throw new Error("Enter your email or user ID.");
+  }
+
+  let email = identifier.toLowerCase();
+
+  if (!identifier.includes("@")) {
+    const normalizedLoginUid = normalizeLoginId(identifier);
+
+    if (!normalizedLoginUid) {
+      throw new Error("Enter a valid user ID.");
+    }
+
+    const { data, error } = await supabase.rpc("resolve_login_email", {
+      requested_login_uid: normalizedLoginUid,
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data || typeof data !== "string") {
+      throw new Error("No active account was found for that user ID.");
+    }
+
+    email = data.toLowerCase();
+  }
+
   return supabase.auth.signInWithPassword({
-    email: payload.email.trim().toLowerCase(),
+    email,
     password: payload.password,
   });
 };

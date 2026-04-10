@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -51,6 +51,7 @@ import {
   useUpdateUserActiveStatusMutation,
   useUpdateUserRoleMutation,
 } from "@/hooks/use-admin-users";
+import { normalizeLoginId } from "@/lib/auth-identifiers";
 import { useUsersQuery } from "@/hooks/use-users";
 import type { CreateUserFormValues, UserRole, UserSummary } from "@/types/crm";
 
@@ -71,6 +72,14 @@ const roleColors: Record<UserRole, string> = {
 const createUserSchema = z
   .object({
     fullName: z.string().trim().min(2, "Full name is required."),
+    loginUid: z
+      .string()
+      .trim()
+      .min(2, "UID is required.")
+      .refine(
+        (value) => normalizeLoginId(value).length >= 2,
+        "Use at least 2 letters or numbers for the UID.",
+      ),
     email: z.string().trim().email("Enter a valid email address."),
     phone: z.string().trim(),
     password: z.string().min(8, "Password must be at least 8 characters."),
@@ -90,6 +99,7 @@ const createUserSchema = z
 
 const createUserDefaults: CreateUserFormValues = {
   fullName: "",
+  loginUid: "",
   email: "",
   phone: "",
   password: "",
@@ -114,9 +124,26 @@ export default function AdminUsersPage() {
     resolver: zodResolver(createUserSchema),
     defaultValues: createUserDefaults,
   });
+  const watchedFullName = createUserForm.watch("fullName");
+  const watchedLoginUid = createUserForm.watch("loginUid");
+  const isLoginUidDirty = Boolean(createUserForm.formState.dirtyFields.loginUid);
 
   const users = useMemo(() => usersQuery.data ?? [], [usersQuery.data]);
   const assignedLeadCounts = countsQuery.data ?? {};
+
+  useEffect(() => {
+    if (isLoginUidDirty) {
+      return;
+    }
+
+    const nextLoginUid = normalizeLoginId(watchedFullName);
+    if (nextLoginUid !== watchedLoginUid) {
+      createUserForm.setValue("loginUid", nextLoginUid, {
+        shouldDirty: false,
+        shouldTouch: false,
+      });
+    }
+  }, [createUserForm, isLoginUidDirty, watchedFullName, watchedLoginUid]);
 
   const filteredUsers = useMemo(
     () =>
@@ -125,6 +152,7 @@ export default function AdminUsersPage() {
         return (
           user.fullName.toLowerCase().includes(query) ||
           user.email.toLowerCase().includes(query) ||
+          (user.loginUid ?? "").toLowerCase().includes(query) ||
           (user.phone ?? "").includes(searchQuery)
         );
       }),
@@ -202,6 +230,7 @@ export default function AdminUsersPage() {
     try {
       await createUserMutation.mutateAsync({
         fullName: values.fullName.trim(),
+        loginUid: normalizeLoginId(values.loginUid),
         email: values.email.trim(),
         phone: values.phone.replace(/[\s()-]/g, "").trim(),
         password: values.password,
@@ -293,7 +322,9 @@ export default function AdminUsersPage() {
                         <div>
                           <p className="text-sm font-medium">{user.fullName}</p>
                           <p className="text-xs text-muted-foreground">
-                            {user.email || user.phone || "No email or phone"}
+                            {user.loginUid
+                              ? `UID: ${user.loginUid}`
+                              : user.email || user.phone || "No email or phone"}
                           </p>
                         </div>
                       </div>
@@ -456,18 +487,33 @@ export default function AdminUsersPage() {
           <DialogHeader>
             <DialogTitle>Create User</DialogTitle>
             <DialogDescription>
-              Create an internal CRM user with email and password. Phone is stored as contact data
-              until phone-based auth is configured.
+              Create a CRM user with a UID, fake auth email, and password. Admins can still log in
+              with their email, while sales users can sign in with UID.
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleCreateUser} className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2 sm:col-span-2">
+              <div className="space-y-2">
                 <Label htmlFor="create-user-full-name">Full name</Label>
                 <Input id="create-user-full-name" {...createUserForm.register("fullName")} />
                 <p className="text-xs text-destructive">
                   {createUserForm.formState.errors.fullName?.message}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="create-user-login-uid">UID</Label>
+                <Input
+                  id="create-user-login-uid"
+                  placeholder="arpan"
+                  {...createUserForm.register("loginUid")}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Sales users will log in with this UID and password.
+                </p>
+                <p className="text-xs text-destructive">
+                  {createUserForm.formState.errors.loginUid?.message}
                 </p>
               </div>
 
@@ -540,8 +586,8 @@ export default function AdminUsersPage() {
             </div>
 
             <div className="rounded-lg border p-3 text-sm text-muted-foreground">
-              Users currently sign in with email and password. Phone is optional here and is saved on
-              their CRM profile for future phone-based auth setup.
+              Fake email accounts remain in Supabase Auth. Admins can still sign in with email and
+              password, while sales users can sign in with UID and password.
             </div>
 
             <DialogFooter>

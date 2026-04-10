@@ -1,4 +1,5 @@
 import { appEnv } from "@/config/env";
+import { normalizeLoginId } from "@/lib/auth-identifiers";
 import { supabase } from "@/lib/supabase";
 import { mapProfileRowToUserSummary } from "@/lib/crm-mappers";
 import { logLeadActivity } from "@/services/leads";
@@ -11,7 +12,7 @@ type LeadRow = Database["public"]["Tables"]["leads"]["Row"];
 export const listUsers = async (): Promise<UserSummary[]> => {
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, full_name, email, role, is_active, avatar_url, phone, created_at, updated_at")
+    .select("id, full_name, email, login_uid, role, is_active, avatar_url, phone, created_at, updated_at")
     .order("full_name", { ascending: true });
 
   if (error) {
@@ -175,7 +176,6 @@ export const createUserFromAdmin = async (
   }
 
   if (
-    values.phone.trim() &&
     data &&
     typeof data === "object" &&
     "user" in data &&
@@ -184,12 +184,18 @@ export const createUserFromAdmin = async (
     "id" in data.user &&
     typeof data.user.id === "string"
   ) {
+    const updates: Database["public"]["Tables"]["profiles"]["Update"] = {
+      login_uid: normalizeLoginId(values.loginUid || values.fullName),
+      updated_at: new Date().toISOString(),
+    };
+
+    if (values.phone.trim()) {
+      updates.phone = values.phone.trim().replace(/[\s()-]/g, "");
+    }
+
     const { error: profileError } = await supabase
       .from("profiles")
-      .update({
-        phone: values.phone.trim().replace(/[\s()-]/g, ""),
-        updated_at: new Date().toISOString(),
-      })
+      .update(updates)
       .eq("id", data.user.id);
 
     if (profileError) {
