@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -51,7 +51,6 @@ import {
   useUpdateUserActiveStatusMutation,
   useUpdateUserRoleMutation,
 } from "@/hooks/use-admin-users";
-import { normalizeLoginId } from "@/lib/auth-identifiers";
 import { useUsersQuery } from "@/hooks/use-users";
 import type { CreateUserFormValues, UserRole, UserSummary } from "@/types/crm";
 
@@ -72,21 +71,7 @@ const roleColors: Record<UserRole, string> = {
 const createUserSchema = z
   .object({
     fullName: z.string().trim().min(2, "Full name is required."),
-    loginUid: z
-      .string()
-      .trim()
-      .min(2, "Login ID is required.")
-      .refine(
-        (value) => normalizeLoginId(value).length >= 2,
-        "Use at least 2 letters or numbers for the login ID.",
-      ),
-    email: z
-      .string()
-      .trim()
-      .refine(
-        (value) => value.length === 0 || z.string().email().safeParse(value).success,
-        "Enter a valid email address.",
-      ),
+    email: z.string().trim().email("Enter a valid email address."),
     phone: z.string().trim(),
     password: z.string().min(8, "Password must be at least 8 characters."),
     role: z.enum(["admin", "sales", "store_manager", "furniture_specialist"]),
@@ -101,19 +86,10 @@ const createUserSchema = z
         path: ["phone"],
       });
     }
-
-    if (values.role === "admin" && values.email.length === 0) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Admin accounts must use a real email address.",
-        path: ["email"],
-      });
-    }
   });
 
 const createUserDefaults: CreateUserFormValues = {
   fullName: "",
-  loginUid: "",
   email: "",
   phone: "",
   password: "",
@@ -138,28 +114,9 @@ export default function AdminUsersPage() {
     resolver: zodResolver(createUserSchema),
     defaultValues: createUserDefaults,
   });
-  const watchedFullName = createUserForm.watch("fullName");
-  const watchedRole = createUserForm.watch("role");
-  const watchedLoginUid = createUserForm.watch("loginUid");
-  const isLoginUidDirty = Boolean(createUserForm.formState.dirtyFields.loginUid);
 
   const users = useMemo(() => usersQuery.data ?? [], [usersQuery.data]);
   const assignedLeadCounts = countsQuery.data ?? {};
-
-  useEffect(() => {
-    if (isLoginUidDirty) {
-      return;
-    }
-
-    const nextLoginUid = normalizeLoginId(watchedFullName);
-
-    if (nextLoginUid !== watchedLoginUid) {
-      createUserForm.setValue("loginUid", nextLoginUid, {
-        shouldDirty: false,
-        shouldTouch: false,
-      });
-    }
-  }, [createUserForm, isLoginUidDirty, watchedFullName, watchedLoginUid]);
 
   const filteredUsers = useMemo(
     () =>
@@ -168,7 +125,6 @@ export default function AdminUsersPage() {
         return (
           user.fullName.toLowerCase().includes(query) ||
           user.email.toLowerCase().includes(query) ||
-          (user.loginUid ?? "").toLowerCase().includes(query) ||
           (user.phone ?? "").includes(searchQuery)
         );
       }),
@@ -246,7 +202,6 @@ export default function AdminUsersPage() {
     try {
       await createUserMutation.mutateAsync({
         fullName: values.fullName.trim(),
-        loginUid: normalizeLoginId(values.loginUid || values.fullName),
         email: values.email.trim(),
         phone: values.phone.replace(/[\s()-]/g, "").trim(),
         password: values.password,
@@ -338,10 +293,7 @@ export default function AdminUsersPage() {
                         <div>
                           <p className="text-sm font-medium">{user.fullName}</p>
                           <p className="text-xs text-muted-foreground">
-                            {user.email ||
-                              (user.loginUid ? `User ID: ${user.loginUid}` : "") ||
-                              user.phone ||
-                              "No email or phone"}
+                            {user.email || user.phone || "No email or phone"}
                           </p>
                         </div>
                       </div>
@@ -504,8 +456,8 @@ export default function AdminUsersPage() {
           <DialogHeader>
             <DialogTitle>Create User</DialogTitle>
             <DialogDescription>
-              Admins continue to sign in with real email addresses. Other team members can sign in
-              with a generated internal user ID and password.
+              Create an internal CRM user with email and password. Phone is stored as contact data
+              until phone-based auth is configured.
             </DialogDescription>
           </DialogHeader>
 
@@ -516,21 +468,6 @@ export default function AdminUsersPage() {
                 <Input id="create-user-full-name" {...createUserForm.register("fullName")} />
                 <p className="text-xs text-destructive">
                   {createUserForm.formState.errors.fullName?.message}
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="create-user-login-id">Login ID</Label>
-                <Input
-                  id="create-user-login-id"
-                  placeholder="arpan"
-                  {...createUserForm.register("loginUid")}
-                />
-                <p className="text-xs text-muted-foreground">
-                  This becomes the user&apos;s sign-in ID for internal accounts.
-                </p>
-                <p className="text-xs text-destructive">
-                  {createUserForm.formState.errors.loginUid?.message}
                 </p>
               </div>
 
@@ -546,9 +483,6 @@ export default function AdminUsersPage() {
                     {...createUserForm.register("email")}
                   />
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Required only for admin accounts.
-                </p>
                 <p className="text-xs text-destructive">
                   {createUserForm.formState.errors.email?.message}
                 </p>
@@ -606,9 +540,8 @@ export default function AdminUsersPage() {
             </div>
 
             <div className="rounded-lg border p-3 text-sm text-muted-foreground">
-              {watchedRole === "admin"
-                ? "Admins use their real email address and password to sign in."
-                : "Non-admin users sign in with their Login ID and password. A hidden internal email is generated automatically for Supabase auth."}
+              Users currently sign in with email and password. Phone is optional here and is saved on
+              their CRM profile for future phone-based auth setup.
             </div>
 
             <DialogFooter>

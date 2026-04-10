@@ -1,6 +1,5 @@
 import { appEnv } from "@/config/env";
 import { supabase } from "@/lib/supabase";
-import { buildInternalAuthEmail, normalizeLoginId } from "@/lib/auth-identifiers";
 import { mapProfileRowToUserSummary } from "@/lib/crm-mappers";
 import { logLeadActivity } from "@/services/leads";
 import type { CreateUserFormValues, UserRole, UserSummary } from "@/types/crm";
@@ -12,7 +11,7 @@ type LeadRow = Database["public"]["Tables"]["leads"]["Row"];
 export const listUsers = async (): Promise<UserSummary[]> => {
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, full_name, email, login_uid, role, is_active, avatar_url, phone, created_at, updated_at")
+    .select("id, full_name, email, role, is_active, avatar_url, phone, created_at, updated_at")
     .order("full_name", { ascending: true });
 
   if (error) {
@@ -156,23 +155,10 @@ export const reassignLeadsForUser = async ({
 export const createUserFromAdmin = async (
   values: CreateUserFormValues,
 ): Promise<void> => {
-  const normalizedLoginUid = normalizeLoginId(values.loginUid || values.fullName);
-  const useRealEmailForAuth = values.role === "admin" && values.email.trim().length > 0;
-  const authEmail = useRealEmailForAuth
-    ? values.email.trim().toLowerCase()
-    : buildInternalAuthEmail(normalizedLoginUid);
-
-  if (!authEmail) {
-    throw new Error("Unable to derive an internal login ID for this user.");
-  }
-
   const payload = {
     full_name: values.fullName.trim(),
-    login_uid: normalizedLoginUid,
-    email: useRealEmailForAuth ? values.email.trim().toLowerCase() : null,
-    auth_email: authEmail,
+    email: values.email.trim().toLowerCase(),
     password: values.password,
-    phone: values.phone.replace(/[\s()-]/g, "").trim() || null,
     role: values.role,
   };
 
@@ -186,5 +172,28 @@ export const createUserFromAdmin = async (
 
   if (data && typeof data === "object" && "error" in data && typeof data.error === "string") {
     throw new Error(data.error);
+  }
+
+  if (
+    values.phone.trim() &&
+    data &&
+    typeof data === "object" &&
+    "user" in data &&
+    data.user &&
+    typeof data.user === "object" &&
+    "id" in data.user &&
+    typeof data.user.id === "string"
+  ) {
+    const { error: profileError } = await supabase
+      .from("profiles")
+      .update({
+        phone: values.phone.trim().replace(/[\s()-]/g, ""),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", data.user.id);
+
+    if (profileError) {
+      throw profileError;
+    }
   }
 };

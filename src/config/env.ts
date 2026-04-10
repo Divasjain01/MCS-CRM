@@ -6,8 +6,6 @@ export const appEnv = {
   appUrl: trim(import.meta.env.VITE_APP_URL) || window.location.origin,
   createUserFunctionName:
     trim(import.meta.env.VITE_SUPABASE_CREATE_USER_FUNCTION) || "rapid-endpoint",
-  internalAuthEmailDomain:
-    trim(import.meta.env.VITE_INTERNAL_AUTH_EMAIL_DOMAIN) || "internal.mcube.local",
 };
 
 export const isSupabaseConfigured =

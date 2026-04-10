@@ -25,7 +25,6 @@ export interface Database {
         Row: {
           id: string;
           email: string | null;
-          login_uid: string | null;
           full_name: string | null;
           role: UserRole;
           is_active: boolean;
@@ -37,7 +36,6 @@ export interface Database {
         Insert: {
           id: string;
           email?: string | null;
-          login_uid?: string | null;
           full_name?: string | null;
           role?: UserRole;
           is_active?: boolean;
@@ -48,7 +46,6 @@ export interface Database {
         };
         Update: {
           email?: string | null;
-          login_uid?: string | null;
           full_name?: string | null;
           role?: UserRole;
           is_active?: boolean;
