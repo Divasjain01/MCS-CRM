@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -31,6 +31,9 @@ import {
 import { mapLeadToFormValues } from "@/lib/crm-mappers";
 import type { Lead, LeadFormValues, UserSummary } from "@/types/crm";
 
+export const LEAD_CREATE_DRAFT_KEY = "mcube:create-lead-draft";
+export const LEAD_CREATE_DIALOG_OPEN_KEY = "mcube:create-lead-dialog-open";
+
 const leadFormSchema = z.object({
   fullName: z.string().trim().min(2, "Full name is required."),
   email: z.string().email("Enter a valid email.").or(z.literal("")),
@@ -43,6 +46,10 @@ const leadFormSchema = z.object({
     "meta",
     "instagram",
     "whatsapp",
+    "bni",
+    "jbn",
+    "indiamart",
+    "justdial",
     "referral",
     "walk_in",
     "website",
@@ -113,6 +120,41 @@ interface LeadFormDialogProps {
   onSubmit: (values: LeadFormValues) => Promise<void>;
 }
 
+const readCreateLeadDraft = () => {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const storedDraft = window.sessionStorage.getItem(LEAD_CREATE_DRAFT_KEY);
+    if (!storedDraft) {
+      return null;
+    }
+
+    const parsedDraft = JSON.parse(storedDraft);
+    const validation = leadFormSchema.safeParse(parsedDraft);
+    return validation.success ? validation.data : null;
+  } catch {
+    return null;
+  }
+};
+
+const writeCreateLeadDraft = (values: LeadFormValues) => {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.sessionStorage.setItem(LEAD_CREATE_DRAFT_KEY, JSON.stringify(values));
+};
+
+const clearCreateLeadDraft = () => {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.sessionStorage.removeItem(LEAD_CREATE_DRAFT_KEY);
+};
+
 export function LeadFormDialog({
   lead,
   open,
@@ -121,16 +163,48 @@ export function LeadFormDialog({
   isSubmitting = false,
   onSubmit,
 }: LeadFormDialogProps) {
-  const initialValues = useMemo(() => (lead ? mapLeadToFormValues(lead) : defaultValues), [lead]);
+  const initialValues = useMemo(() => {
+    if (lead) {
+      return mapLeadToFormValues(lead);
+    }
+
+    return readCreateLeadDraft() ?? defaultValues;
+  }, [lead]);
 
   const form = useForm<LeadFormValues>({
     resolver: zodResolver(leadFormSchema),
-    values: initialValues,
+    defaultValues: initialValues,
   });
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    form.reset(lead ? mapLeadToFormValues(lead) : readCreateLeadDraft() ?? defaultValues);
+  }, [form, lead, open]);
+
+  useEffect(() => {
+    if (!open || lead) {
+      return;
+    }
+
+    const subscription = form.watch((values) => {
+      writeCreateLeadDraft({
+        ...defaultValues,
+        ...values,
+      } as LeadFormValues);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [form, lead, open]);
 
   const submit = form.handleSubmit(async (values) => {
     await onSubmit(values);
-    form.reset(defaultValues);
+    if (!lead) {
+      clearCreateLeadDraft();
+      form.reset(defaultValues);
+    }
   });
 
   const quotationRequired = form.watch("quotationRequired");
@@ -139,7 +213,7 @@ export function LeadFormDialog({
     <Dialog
       open={open}
       onOpenChange={(nextOpen) => {
-        if (!nextOpen) {
+        if (!nextOpen && lead) {
           form.reset(initialValues);
         }
         onOpenChange(nextOpen);

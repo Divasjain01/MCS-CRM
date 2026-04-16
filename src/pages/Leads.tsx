@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
@@ -30,7 +30,10 @@ import {
 } from "@/components/ui/select";
 import { SourceBadge } from "@/components/ui/source-badge";
 import { StageBadge } from "@/components/ui/stage-badge";
-import { LeadFormDialog } from "@/components/leads/LeadFormDialog";
+import {
+  LEAD_CREATE_DIALOG_OPEN_KEY,
+  LeadFormDialog,
+} from "@/components/leads/LeadFormDialog";
 import { toast } from "@/components/ui/sonner";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -64,8 +67,27 @@ export default function LeadsPage() {
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
   const [sortField, setSortField] = useState<keyof Lead>("createdAt");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(() => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+
+    return window.sessionStorage.getItem(LEAD_CREATE_DIALOG_OPEN_KEY) === "true";
+  });
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    if (dialogOpen && !editingLead) {
+      window.sessionStorage.setItem(LEAD_CREATE_DIALOG_OPEN_KEY, "true");
+      return;
+    }
+
+    window.sessionStorage.removeItem(LEAD_CREATE_DIALOG_OPEN_KEY);
+  }, [dialogOpen, editingLead]);
 
   const filteredLeads = useMemo(
     () =>
