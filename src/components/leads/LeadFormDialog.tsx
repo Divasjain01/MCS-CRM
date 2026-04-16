@@ -42,7 +42,6 @@ const leadFormSchema = z.object({
   companyName: z.string(),
   leadType: z.enum(["homeowner", "architect", "interior_designer", "contractor", "builder"]),
   source: z.enum([
-    "shopify",
     "meta",
     "instagram",
     "whatsapp",

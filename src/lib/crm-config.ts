@@ -91,7 +91,7 @@ export const leadStageOptions = Object.entries(stageLabels)
 export const leadSourceOptions = Object.entries(sourceLabels).map(([value, label]) => ({
   value: value as LeadSource,
   label,
-}));
+})).filter((option) => option.value !== "shopify");
 
 export const leadTypeOptions = Object.entries(leadTypeLabels).map(([value, label]) => ({
   value: value as LeadType,

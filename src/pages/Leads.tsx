@@ -44,7 +44,7 @@ import {
 import { useUsersQuery } from "@/hooks/use-users";
 import { downloadCsv } from "@/lib/csv";
 import { getAssignableUsers } from "@/lib/access-control";
-import { leadStageOptions, leadTypeLabels, sourceLabels, stageLabels } from "@/lib/crm-config";
+import { leadSourceOptions, leadStageOptions, leadTypeLabels, stageLabels } from "@/lib/crm-config";
 import { exportLeadsToCsv } from "@/services/leads";
 import type { Lead, LeadFormValues, UserRole } from "@/types/crm";
 
@@ -264,9 +264,9 @@ export default function LeadsPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Sources</SelectItem>
-            {Object.entries(sourceLabels).map(([key, label]) => (
-              <SelectItem key={key} value={key}>
-                {label}
+            {leadSourceOptions.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
               </SelectItem>
             ))}
           </SelectContent>
