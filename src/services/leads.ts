@@ -13,6 +13,7 @@ import {
   mapLeadFormValuesToUpdate,
   mapLeadRowToLead,
 } from "@/lib/crm-mappers";
+import { normalizeLeadPhone } from "@/lib/phone";
 import type {
   ActivityType,
   Lead,
@@ -35,6 +36,20 @@ const selectLeadColumns =
 const formatSupabaseError = (error: PostgrestError) => {
   const parts = [error.message, error.details, error.hint].filter(Boolean);
   return new Error(parts.join(" | "));
+};
+
+const isDuplicateLeadPhoneError = (error: PostgrestError) =>
+  error.code === "23505" &&
+  ((error.message ?? "").includes("idx_leads_phone_normalized_unique") ||
+    (error.details ?? "").includes("phone_normalized") ||
+    (error.message ?? "").includes("phone_normalized"));
+
+const formatLeadMutationError = (error: PostgrestError) => {
+  if (isDuplicateLeadPhoneError(error)) {
+    return new Error("A lead with this phone number already exists.");
+  }
+
+  return formatSupabaseError(error);
 };
 
 export const logLeadActivity = async (
@@ -130,6 +145,11 @@ export const createLead = async (
 ): Promise<Lead> => {
   const payload = mapLeadFormValuesToInsert(values, actorId);
   assertAssignableUser(payload.assigned_to, actorRole, users);
+  payload.phone = normalizeLeadPhone(payload.phone) ?? payload.phone;
+  if (payload.alternate_phone) {
+    payload.alternate_phone =
+      normalizeLeadPhone(payload.alternate_phone) ?? payload.alternate_phone;
+  }
   const { data, error } = await supabase
     .from("leads")
     .insert(payload)
@@ -137,7 +157,7 @@ export const createLead = async (
     .single();
 
   if (error) {
-    throw formatSupabaseError(error);
+    throw formatLeadMutationError(error);
   }
 
   const createdLead = mapLeadRowToLead(
@@ -183,6 +203,13 @@ export const updateLead = async (
     ...mapLeadFormValuesToUpdate(values),
     updated_at: new Date().toISOString(),
   };
+  if (payload.phone) {
+    payload.phone = normalizeLeadPhone(payload.phone) ?? payload.phone;
+  }
+  if (payload.alternate_phone) {
+    payload.alternate_phone =
+      normalizeLeadPhone(payload.alternate_phone) ?? payload.alternate_phone;
+  }
   assertAssignableUser(payload.assigned_to, actorRole, users);
 
   const { data, error } = await supabase
@@ -193,7 +220,7 @@ export const updateLead = async (
     .single();
 
   if (error) {
-    throw formatSupabaseError(error);
+    throw formatLeadMutationError(error);
   }
 
   const updatedLead = mapLeadRowToLead(
@@ -365,6 +392,10 @@ export const importLeadsBatch = async (
 
   const rowsToInsert = payloads.map((payload) => ({
     ...payload,
+    phone: normalizeLeadPhone(payload.phone) ?? payload.phone,
+    alternate_phone: payload.alternate_phone
+      ? normalizeLeadPhone(payload.alternate_phone) ?? payload.alternate_phone
+      : null,
     created_by: actorId,
   }));
 
@@ -374,7 +405,7 @@ export const importLeadsBatch = async (
     .select(selectLeadColumns);
 
   if (error) {
-    throw error;
+    throw formatLeadMutationError(error);
   }
 
   const insertedRows = (data as LeadRow[]) ?? [];

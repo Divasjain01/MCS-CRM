@@ -29,6 +29,7 @@ import {
   showroomVisitStatusOptions,
 } from "@/lib/crm-config";
 import { mapLeadToFormValues } from "@/lib/crm-mappers";
+import { isValidLeadPhone } from "@/lib/phone";
 import type { Lead, LeadFormValues, UserSummary } from "@/types/crm";
 
 export const LEAD_CREATE_DRAFT_KEY = "mcube:create-lead-draft";
@@ -37,8 +38,16 @@ export const LEAD_CREATE_DIALOG_OPEN_KEY = "mcube:create-lead-dialog-open";
 const leadFormSchema = z.object({
   fullName: z.string().trim().min(2, "Full name is required."),
   email: z.string().email("Enter a valid email.").or(z.literal("")),
-  phone: z.string().trim().min(8, "Phone number is required."),
-  alternatePhone: z.string(),
+  phone: z
+    .string()
+    .trim()
+    .min(8, "Phone number is required.")
+    .refine((value) => isValidLeadPhone(value), {
+      message: "Enter a valid phone number. Indian numbers can be entered without +91.",
+    }),
+  alternatePhone: z.string().refine((value) => !value.trim() || isValidLeadPhone(value), {
+    message: "Enter a valid alternate phone number.",
+  }),
   companyName: z.string(),
   leadType: z.enum(["homeowner", "architect", "interior_designer", "contractor", "builder"]),
   source: z.enum([
@@ -249,6 +258,9 @@ export function LeadFormDialog({
             <div className="space-y-2">
               <Label htmlFor="lead-alt-phone">Alternate phone</Label>
               <Input id="lead-alt-phone" {...form.register("alternatePhone")} />
+              <p className="text-xs text-destructive">
+                {form.formState.errors.alternatePhone?.message}
+              </p>
             </div>
 
             <div className="space-y-2">

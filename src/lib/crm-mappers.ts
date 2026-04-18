@@ -8,6 +8,7 @@ import type {
   UserSummary,
 } from "@/types/crm";
 import type { Database } from "@/types/database";
+import { normalizeLeadPhone } from "@/lib/phone";
 
 type LeadRow = Database["public"]["Tables"]["leads"]["Row"];
 type LeadInsert = Database["public"]["Tables"]["leads"]["Insert"];
@@ -138,8 +139,10 @@ export const mapLeadFormValuesToInsert = (
 ): LeadInsert => ({
   full_name: values.fullName.trim(),
   email: nullableText(values.email),
-  phone: values.phone.trim(),
-  alternate_phone: nullableText(values.alternatePhone),
+  phone: normalizeLeadPhone(values.phone) ?? values.phone.trim(),
+  alternate_phone: nullableText(values.alternatePhone)
+    ? normalizeLeadPhone(values.alternatePhone) ?? values.alternatePhone.trim()
+    : null,
   company_name: nullableText(values.companyName),
   lead_type: values.leadType,
   source: values.source,
@@ -167,8 +170,10 @@ export const mapLeadFormValuesToUpdate = (
 ): LeadUpdate => ({
   full_name: values.fullName.trim(),
   email: nullableText(values.email),
-  phone: values.phone.trim(),
-  alternate_phone: nullableText(values.alternatePhone),
+  phone: normalizeLeadPhone(values.phone) ?? values.phone.trim(),
+  alternate_phone: nullableText(values.alternatePhone)
+    ? normalizeLeadPhone(values.alternatePhone) ?? values.alternatePhone.trim()
+    : null,
   company_name: nullableText(values.companyName),
   lead_type: values.leadType,
   source: values.source,

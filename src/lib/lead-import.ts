@@ -5,6 +5,7 @@ import {
   sourceLabels,
   stageLabels,
 } from "@/lib/crm-config";
+import { normalizeLeadPhone } from "@/lib/phone";
 import type {
   Lead,
   LeadImportField,
@@ -152,8 +153,7 @@ const resolveAssignedUser = (value: string | undefined, users: UserSummary[]) =>
   return match?.id ?? null;
 };
 
-const normalizePhone = (value: string | null | undefined) =>
-  (value ?? "").replace(/[^\d+]/g, "");
+const normalizePhone = (value: string | null | undefined) => normalizeLeadPhone(value) ?? "";
 
 export const leadImportFields: { value: LeadImportField; label: string; required?: boolean }[] = [
   { value: "full_name", label: "Full Name", required: true },
@@ -204,7 +204,11 @@ const buildLeadInsert = (
   };
 
   const fullName = getValue("full_name").trim();
-  const phone = getValue("phone").trim();
+  const rawPhone = getValue("phone").trim();
+  const phone = normalizeLeadPhone(rawPhone);
+  const rawAlternatePhone = getValue("alternate_phone");
+  const alternatePhone = nullableText(rawAlternatePhone);
+  const normalizedAlternatePhone = alternatePhone ? normalizeLeadPhone(alternatePhone) : null;
   const email = nullableText(getValue("email"));
   const showroomVisitDate = parseDate(getValue("showroom_visit_date"));
   const nextFollowUpAt = parseDate(getValue("next_follow_up_at"));
@@ -221,8 +225,14 @@ const buildLeadInsert = (
     errors.push("Full Name is required.");
   }
 
-  if (!phone) {
+  if (!rawPhone) {
     errors.push("Phone is required.");
+  } else if (!phone) {
+    errors.push("Phone must be a valid mobile number with country code when needed.");
+  }
+
+  if (alternatePhone && !normalizedAlternatePhone) {
+    errors.push("Alternate Phone must be a valid mobile number.");
   }
 
   if (getValue("lead_type") && !parseEnum(getValue("lead_type"), leadTypeLookup)) {
@@ -264,8 +274,8 @@ const buildLeadInsert = (
   return {
     full_name: fullName,
     email,
-    phone,
-    alternate_phone: nullableText(getValue("alternate_phone")),
+    phone: phone ?? rawPhone,
+    alternate_phone: normalizedAlternatePhone,
     company_name: nullableText(getValue("company_name")),
     lead_type: leadType,
     source,
