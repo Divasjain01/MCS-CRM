@@ -182,9 +182,7 @@ export interface FollowUp {
 export interface LeadFormValues {
   fullName: string;
   email: string;
-  phoneCountryCode: string;
   phone: string;
-  alternatePhoneCountryCode: string;
   alternatePhone: string;
   companyName: string;
   leadType: LeadType;

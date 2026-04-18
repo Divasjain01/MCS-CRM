@@ -8,7 +8,6 @@ import type {
   UserSummary,
 } from "@/types/crm";
 import type { Database } from "@/types/database";
-import { DEFAULT_COUNTRY_CODE, formatPhoneForStorage, splitStoredPhone } from "@/lib/phone";
 
 type LeadRow = Database["public"]["Tables"]["leads"]["Row"];
 type LeadInsert = Database["public"]["Tables"]["leads"]["Insert"];
@@ -139,10 +138,8 @@ export const mapLeadFormValuesToInsert = (
 ): LeadInsert => ({
   full_name: values.fullName.trim(),
   email: nullableText(values.email),
-  phone: formatPhoneForStorage(values.phone, values.phoneCountryCode),
-  alternate_phone: values.alternatePhone.trim()
-    ? formatPhoneForStorage(values.alternatePhone, values.alternatePhoneCountryCode)
-    : null,
+  phone: values.phone.trim(),
+  alternate_phone: nullableText(values.alternatePhone),
   company_name: nullableText(values.companyName),
   lead_type: values.leadType,
   source: values.source,
@@ -170,10 +167,8 @@ export const mapLeadFormValuesToUpdate = (
 ): LeadUpdate => ({
   full_name: values.fullName.trim(),
   email: nullableText(values.email),
-  phone: formatPhoneForStorage(values.phone, values.phoneCountryCode),
-  alternate_phone: values.alternatePhone.trim()
-    ? formatPhoneForStorage(values.alternatePhone, values.alternatePhoneCountryCode)
-    : null,
+  phone: values.phone.trim(),
+  alternate_phone: nullableText(values.alternatePhone),
   company_name: nullableText(values.companyName),
   lead_type: values.leadType,
   source: values.source,
@@ -195,38 +190,31 @@ export const mapLeadFormValuesToUpdate = (
   lost_reason: nullableText(values.lostReason),
 });
 
-export const mapLeadToFormValues = (lead: Lead): LeadFormValues => {
-  const primaryPhone = splitStoredPhone(lead.phone);
-  const alternatePhone = splitStoredPhone(lead.alternatePhone);
-
-  return {
-    fullName: lead.fullName,
-    email: lead.email ?? "",
-    phoneCountryCode: primaryPhone.countryCode || DEFAULT_COUNTRY_CODE,
-    phone: primaryPhone.localNumber,
-    alternatePhoneCountryCode: alternatePhone.countryCode || DEFAULT_COUNTRY_CODE,
-    alternatePhone: alternatePhone.localNumber,
-    companyName: lead.companyName ?? "",
-    leadType: lead.leadType,
-    source: lead.source,
-    sourceDetail: lead.sourceDetail ?? "",
-    stage: lead.stage,
-    assignedTo: lead.assignedTo ?? "",
-    projectLocation: lead.projectLocation ?? "",
-    city: lead.city ?? "",
-    requirementSummary: lead.requirementSummary ?? "",
-    productInterest: lead.productInterest ?? "",
-    showroomVisitStatus: lead.showroomVisitStatus,
-    showroomVisitDate: lead.showroomVisitDate ?? "",
-    quotationRequired: lead.quotationRequired,
-    quotationValue: lead.quotationValue?.toString() ?? "",
-    budget: lead.budget?.toString() ?? "",
-    priority: lead.priority,
-    notesSummary: lead.notesSummary ?? "",
-    nextFollowUpAt: lead.nextFollowUpAt ?? "",
-    lostReason: lead.lostReason ?? "",
-  };
-};
+export const mapLeadToFormValues = (lead: Lead): LeadFormValues => ({
+  fullName: lead.fullName,
+  email: lead.email ?? "",
+  phone: lead.phone,
+  alternatePhone: lead.alternatePhone ?? "",
+  companyName: lead.companyName ?? "",
+  leadType: lead.leadType,
+  source: lead.source,
+  sourceDetail: lead.sourceDetail ?? "",
+  stage: lead.stage,
+  assignedTo: lead.assignedTo ?? "",
+  projectLocation: lead.projectLocation ?? "",
+  city: lead.city ?? "",
+  requirementSummary: lead.requirementSummary ?? "",
+  productInterest: lead.productInterest ?? "",
+  showroomVisitStatus: lead.showroomVisitStatus,
+  showroomVisitDate: lead.showroomVisitDate ?? "",
+  quotationRequired: lead.quotationRequired,
+  quotationValue: lead.quotationValue?.toString() ?? "",
+  budget: lead.budget?.toString() ?? "",
+  priority: lead.priority,
+  notesSummary: lead.notesSummary ?? "",
+  nextFollowUpAt: lead.nextFollowUpAt ?? "",
+  lostReason: lead.lostReason ?? "",
+});
 
 export const mapFollowUpFormValuesToInsert = (
   values: FollowUpFormValues,

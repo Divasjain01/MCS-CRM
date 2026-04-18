@@ -21,7 +21,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { CountryCodeSelect } from "@/components/ui/country-code-select";
 import {
   leadPriorityOptions,
   leadSourceOptions,
@@ -29,7 +28,6 @@ import {
   leadTypeOptions,
   showroomVisitStatusOptions,
 } from "@/lib/crm-config";
-import { DEFAULT_COUNTRY_CODE } from "@/lib/phone";
 import { mapLeadToFormValues } from "@/lib/crm-mappers";
 import type { Lead, LeadFormValues, UserSummary } from "@/types/crm";
 
@@ -39,9 +37,7 @@ export const LEAD_CREATE_DIALOG_OPEN_KEY = "mcube:create-lead-dialog-open";
 const leadFormSchema = z.object({
   fullName: z.string().trim().min(2, "Full name is required."),
   email: z.string().email("Enter a valid email.").or(z.literal("")),
-  phoneCountryCode: z.string().trim().min(1, "Country code is required."),
-  phone: z.string().trim().min(6, "Phone number is required."),
-  alternatePhoneCountryCode: z.string().trim(),
+  phone: z.string().trim().min(8, "Phone number is required."),
   alternatePhone: z.string(),
   companyName: z.string(),
   leadType: z.enum(["homeowner", "architect", "interior_designer", "contractor", "builder"]),
@@ -91,9 +87,7 @@ const leadFormSchema = z.object({
 const defaultValues: LeadFormValues = {
   fullName: "",
   email: "",
-  phoneCountryCode: DEFAULT_COUNTRY_CODE,
   phone: "",
-  alternatePhoneCountryCode: DEFAULT_COUNTRY_CODE,
   alternatePhone: "",
   companyName: "",
   leadType: "homeowner",
@@ -242,17 +236,7 @@ export function LeadFormDialog({
 
             <div className="space-y-2">
               <Label htmlFor="lead-phone">Phone</Label>
-              <div className="flex gap-2">
-                <CountryCodeSelect
-                  value={form.watch("phoneCountryCode")}
-                  onChange={(value) =>
-                    form.setValue("phoneCountryCode", value, {
-                      shouldDirty: true,
-                    })
-                  }
-                />
-                <Input id="lead-phone" inputMode="tel" {...form.register("phone")} />
-              </div>
+              <Input id="lead-phone" {...form.register("phone")} />
               <p className="text-xs text-destructive">{form.formState.errors.phone?.message}</p>
             </div>
 
@@ -264,17 +248,7 @@ export function LeadFormDialog({
 
             <div className="space-y-2">
               <Label htmlFor="lead-alt-phone">Alternate phone</Label>
-              <div className="flex gap-2">
-                <CountryCodeSelect
-                  value={form.watch("alternatePhoneCountryCode")}
-                  onChange={(value) =>
-                    form.setValue("alternatePhoneCountryCode", value, {
-                      shouldDirty: true,
-                    })
-                  }
-                />
-                <Input id="lead-alt-phone" inputMode="tel" {...form.register("alternatePhone")} />
-              </div>
+              <Input id="lead-alt-phone" {...form.register("alternatePhone")} />
             </div>
 
             <div className="space-y-2">

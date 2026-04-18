@@ -11,28 +11,7 @@ const corsHeaders = {
 const selectLeadColumns =
   "id, full_name, email, phone, alternate_phone, company_name, lead_type, source, source_detail, stage, assigned_to, project_location, city, requirement_summary, product_interest, showroom_visit_status, showroom_visit_date, quotation_required, quotation_value, budget, priority, notes_summary, next_follow_up_at, last_contacted_at, lost_reason, created_by, created_at, updated_at";
 
-const defaultCountryCode = "+91";
-
-const canonicalizePhone = (value: string) => {
-  const trimmed = value.trim();
-  const digits = value.replace(/\D/g, "");
-
-  if (!digits) {
-    return "";
-  }
-
-  if (trimmed.startsWith("+")) {
-    return `+${digits}`;
-  }
-
-  if (digits.length <= 10) {
-    return `${defaultCountryCode}${digits.slice(-10)}`;
-  }
-
-  return `+${digits}`;
-};
-
-const normalizePhone = (value: string) => canonicalizePhone(value).replace(/\D/g, "").slice(-10);
+const normalizePhone = (value: string) => value.replace(/\D/g, "").slice(-10);
 
 const trimText = (value: unknown) => (typeof value === "string" ? value.trim() : "");
 
@@ -63,10 +42,8 @@ const nullableDate = (value: unknown) => {
 const sanitizeLeadPayload = (input: Record<string, unknown>, actorId: string) => ({
   full_name: trimText(input.full_name),
   email: nullableText(input.email)?.toLowerCase() ?? null,
-  phone: canonicalizePhone(trimText(input.phone)),
-  alternate_phone: nullableText(input.alternate_phone)
-    ? canonicalizePhone(trimText(input.alternate_phone))
-    : null,
+  phone: trimText(input.phone),
+  alternate_phone: nullableText(input.alternate_phone),
   company_name: nullableText(input.company_name),
   lead_type: trimText(input.lead_type) || "homeowner",
   source: trimText(input.source) || "manual",
