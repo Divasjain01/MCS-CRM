@@ -29,6 +29,7 @@ import type { PostgrestError } from "@supabase/supabase-js";
 
 type LeadRow = Database["public"]["Tables"]["leads"]["Row"];
 type LeadActivityRow = Database["public"]["Tables"]["lead_activities"]["Row"];
+type ExistingLeadLookup = Pick<LeadRow, "id" | "full_name" | "phone">;
 
 const selectLeadColumns =
   "id, full_name, email, phone, alternate_phone, company_name, lead_type, source, source_detail, stage, assigned_to, project_location, city, requirement_summary, product_interest, showroom_visit_status, showroom_visit_date, quotation_required, quotation_value, budget, priority, notes_summary, next_follow_up_at, last_contacted_at, lost_reason, created_by, created_at, updated_at";
@@ -50,6 +51,35 @@ const formatLeadMutationError = (error: PostgrestError) => {
   }
 
   return formatSupabaseError(error);
+};
+
+const findExistingLeadByPhone = async (
+  rawPhone: string,
+  excludeLeadId?: string,
+): Promise<ExistingLeadLookup | null> => {
+  const normalizedPhone = normalizeLeadPhone(rawPhone);
+
+  if (!normalizedPhone) {
+    return null;
+  }
+
+  let query = supabase
+    .from("leads")
+    .select("id, full_name, phone")
+    .eq("phone_normalized", normalizedPhone)
+    .limit(1);
+
+  if (excludeLeadId) {
+    query = query.neq("id", excludeLeadId);
+  }
+
+  const { data, error } = await query.maybeSingle();
+
+  if (error) {
+    throw formatSupabaseError(error);
+  }
+
+  return (data as ExistingLeadLookup | null) ?? null;
 };
 
 export const logLeadActivity = async (
@@ -150,6 +180,12 @@ export const createLead = async (
     payload.alternate_phone =
       normalizeLeadPhone(payload.alternate_phone) ?? payload.alternate_phone;
   }
+
+  const existingLead = await findExistingLeadByPhone(payload.phone);
+  if (existingLead) {
+    throw new Error(`This number already exists for ${existingLead.full_name}.`);
+  }
+
   const { data, error } = await supabase
     .from("leads")
     .insert(payload)
@@ -211,6 +247,13 @@ export const updateLead = async (
       normalizeLeadPhone(payload.alternate_phone) ?? payload.alternate_phone;
   }
   assertAssignableUser(payload.assigned_to, actorRole, users);
+
+  if (payload.phone) {
+    const existingLead = await findExistingLeadByPhone(payload.phone, leadId);
+    if (existingLead) {
+      throw new Error(`This number already exists for ${existingLead.full_name}.`);
+    }
+  }
 
   const { data, error } = await supabase
     .from("leads")

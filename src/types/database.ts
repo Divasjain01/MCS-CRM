@@ -63,6 +63,7 @@ export interface Database {
           full_name: string;
           email: string | null;
           phone: string;
+          phone_normalized: string | null;
           alternate_phone: string | null;
           company_name: string | null;
           lead_type: LeadType;
@@ -93,6 +94,7 @@ export interface Database {
           full_name: string;
           email?: string | null;
           phone: string;
+          phone_normalized?: string | null;
           alternate_phone?: string | null;
           company_name?: string | null;
           lead_type?: LeadType;
@@ -122,6 +124,7 @@ export interface Database {
           full_name?: string;
           email?: string | null;
           phone?: string;
+          phone_normalized?: string | null;
           alternate_phone?: string | null;
           company_name?: string | null;
           lead_type?: LeadType;

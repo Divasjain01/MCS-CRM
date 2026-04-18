@@ -312,6 +312,11 @@ export const buildLeadImportPreview = ({
   const seenPhones = new Set<string>();
   const seenEmails = new Set<string>();
   const existingPhones = new Set(existingLeads.map((lead) => normalizePhone(lead.phone)));
+  const existingLeadByPhone = new Map(
+    existingLeads
+      .map((lead) => [normalizePhone(lead.phone), lead] as const)
+      .filter(([phone]) => Boolean(phone)),
+  );
   const existingEmails = new Set(
     existingLeads.map((lead) => normalize(lead.email ?? "")).filter(Boolean),
   );
@@ -324,7 +329,10 @@ export const buildLeadImportPreview = ({
     let duplicateReason: string | null = null;
 
     if (phoneKey && existingPhones.has(phoneKey)) {
-      duplicateReason = "Phone already exists in the CRM.";
+      const existingLead = existingLeadByPhone.get(phoneKey);
+      duplicateReason = existingLead?.fullName
+        ? `This number already exists for ${existingLead.fullName}.`
+        : "Phone already exists in the CRM.";
     } else if (phoneKey && seenPhones.has(phoneKey)) {
       duplicateReason = "Phone is duplicated within this file.";
     } else if (emailKey && existingEmails.has(emailKey)) {
