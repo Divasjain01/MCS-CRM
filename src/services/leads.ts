@@ -1,3 +1,4 @@
+import { appEnv } from "@/config/env";
 import { supabase } from "@/lib/supabase";
 import { toCsv } from "@/lib/csv";
 import {
@@ -28,6 +29,7 @@ import type { PostgrestError } from "@supabase/supabase-js";
 
 type LeadRow = Database["public"]["Tables"]["leads"]["Row"];
 type LeadActivityRow = Database["public"]["Tables"]["lead_activities"]["Row"];
+type LeadInsert = Database["public"]["Tables"]["leads"]["Insert"];
 
 const selectLeadColumns =
   "id, full_name, email, phone, alternate_phone, company_name, lead_type, source, source_detail, stage, assigned_to, project_location, city, requirement_summary, product_interest, showroom_visit_status, showroom_visit_date, quotation_required, quotation_value, budget, priority, notes_summary, next_follow_up_at, last_contacted_at, lost_reason, created_by, created_at, updated_at";
@@ -35,6 +37,36 @@ const selectLeadColumns =
 const formatSupabaseError = (error: PostgrestError) => {
   const parts = [error.message, error.details, error.hint].filter(Boolean);
   return new Error(parts.join(" | "));
+};
+
+interface LeadIntakeResponse {
+  success: boolean;
+  createdCount: number;
+  skippedCount: number;
+  leads: LeadRow[];
+  errors?: Array<{ index: number; error: string }>;
+  error?: string;
+}
+
+const getLeadIntakeError = (response: LeadIntakeResponse) =>
+  response.error || response.errors?.[0]?.error || "Unable to create lead.";
+
+const invokeLeadIntake = async (payload: Record<string, unknown>) => {
+  const { data, error } = await supabase.functions.invoke(appEnv.leadIntakeFunctionName, {
+    body: payload,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? {
+    success: false,
+    createdCount: 0,
+    skippedCount: 0,
+    leads: [],
+    error: "Lead intake function returned no data.",
+  }) as LeadIntakeResponse;
 };
 
 export const logLeadActivity = async (
@@ -128,45 +160,19 @@ export const createLead = async (
   actorRole: UserRole | null,
   users: UserSummary[] = [],
 ): Promise<Lead> => {
-  const payload = mapLeadFormValuesToInsert(values, actorId);
+  void actorId;
+  const payload = mapLeadFormValuesToInsert(values, null);
   assertAssignableUser(payload.assigned_to, actorRole, users);
-  const { data, error } = await supabase
-    .from("leads")
-    .insert(payload)
-    .select(selectLeadColumns)
-    .single();
+  const response = await invokeLeadIntake({ lead: payload });
 
-  if (error) {
-    throw formatSupabaseError(error);
+  if (!response.success || response.leads.length === 0) {
+    throw new Error(getLeadIntakeError(response));
   }
 
   const createdLead = mapLeadRowToLead(
-    data as LeadRow,
+    response.leads[0],
     payload.assigned_to ? users.find((user) => user.id === payload.assigned_to) ?? null : null,
   );
-
-  await logLeadActivity(
-    createdLead.id,
-    "lead_created",
-    `Lead created for ${createdLead.fullName}`,
-    actorId,
-  );
-
-  if (createdLead.assignedTo) {
-    await createLeadAssignmentRecord(
-      createdLead.id,
-      createdLead.assignedTo,
-      actorId,
-      "Initial assignment",
-    );
-    await logLeadActivity(
-      createdLead.id,
-      "assignment_changed",
-      "Lead assigned during creation",
-      actorId,
-      { assigned_to: createdLead.assignedTo },
-    );
-  }
 
   return createdLead;
 };
@@ -363,48 +369,17 @@ export const importLeadsBatch = async (
     };
   }
 
-  const rowsToInsert = payloads.map((payload) => ({
-    ...payload,
-    created_by: actorId,
-  }));
+  void actorId;
 
-  const { data, error } = await supabase
-    .from("leads")
-    .insert(rowsToInsert)
-    .select(selectLeadColumns);
+  const response = await invokeLeadIntake({ leads: payloads, mode: "import" });
 
-  if (error) {
-    throw error;
+  if (!response.success && response.createdCount === 0) {
+    throw new Error(getLeadIntakeError(response));
   }
 
-  const insertedRows = (data as LeadRow[]) ?? [];
-
-  await Promise.all(
-    insertedRows.map(async (row) => {
-      await logLeadActivity(
-        row.id,
-        "lead_created",
-        `Lead imported for ${row.full_name}`,
-        actorId,
-        { import: true },
-      );
-
-      if (row.assigned_to) {
-        await createLeadAssignmentRecord(row.id, row.assigned_to, actorId, "Imported assignment");
-        await logLeadActivity(
-          row.id,
-          "assignment_changed",
-          "Lead assigned during import",
-          actorId,
-          { assigned_to: row.assigned_to, import: true },
-        );
-      }
-    }),
-  );
-
   return {
-    insertedCount: insertedRows.length,
-    skippedCount: Math.max(payloads.length - insertedRows.length, 0),
+    insertedCount: response.createdCount,
+    skippedCount: response.skippedCount,
   };
 };
 

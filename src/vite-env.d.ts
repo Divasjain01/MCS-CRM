@@ -6,6 +6,7 @@ interface ImportMetaEnv {
   readonly VITE_SUPABASE_ANON_KEY?: string;
   readonly VITE_APP_URL?: string;
   readonly VITE_SUPABASE_CREATE_USER_FUNCTION?: string;
+  readonly VITE_SUPABASE_LEAD_INTAKE_FUNCTION?: string;
 }
 
 interface ImportMeta {
