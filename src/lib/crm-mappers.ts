@@ -228,7 +228,7 @@ export const mapFollowUpFormValuesToInsert = (
 ) => ({
   lead_id: leadId,
   assigned_to: values.assignedTo || null,
-  due_at: values.dueAt,
+  due_at: nullableDate(values.dueAt),
   note: nullableText(values.note),
   created_by: actorId,
 });
