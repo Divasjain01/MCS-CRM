@@ -44,7 +44,13 @@ import {
 import { useUsersQuery } from "@/hooks/use-users";
 import { downloadCsv } from "@/lib/csv";
 import { getAssignableUsers } from "@/lib/access-control";
-import { leadSourceOptions, leadStageOptions, leadTypeLabels, stageLabels } from "@/lib/crm-config";
+import {
+  leadSourceOptions,
+  leadStageOptions,
+  leadTypeLabels,
+  leadTypeOptions,
+  stageLabels,
+} from "@/lib/crm-config";
 import { exportLeadsToCsv } from "@/services/leads";
 import type { Lead, LeadFormValues, UserRole } from "@/types/crm";
 
@@ -60,10 +66,16 @@ export default function LeadsPage() {
   const leadsQuery = useLeadsQuery(users);
   const createLeadMutation = useCreateLeadMutation();
   const updateLeadMutation = useUpdateLeadMutation();
+  const salesUsers = useMemo(
+    () => users.filter((user) => user.isActive && user.role === "sales"),
+    [users],
+  );
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStage, setSelectedStage] = useState<string>("all");
   const [selectedSource, setSelectedSource] = useState<string>("all");
+  const [selectedAssignedTo, setSelectedAssignedTo] = useState<string>("all");
+  const [selectedLeadType, setSelectedLeadType] = useState<string>("all");
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
   const [sortField, setSortField] = useState<keyof Lead>("createdAt");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
@@ -100,9 +112,26 @@ export default function LeadsPage() {
           (lead.companyName ?? "").toLowerCase().includes(query);
         const matchesStage = selectedStage === "all" || lead.stage === selectedStage;
         const matchesSource = selectedSource === "all" || lead.source === selectedSource;
-        return matchesSearch && matchesStage && matchesSource;
+        const matchesAssignedTo =
+          selectedAssignedTo === "all" || lead.assignedTo === selectedAssignedTo;
+        const matchesLeadType =
+          selectedLeadType === "all" || lead.leadType === selectedLeadType;
+        return (
+          matchesSearch &&
+          matchesStage &&
+          matchesSource &&
+          matchesAssignedTo &&
+          matchesLeadType
+        );
       }),
-    [leadsQuery.data, searchQuery, selectedSource, selectedStage],
+    [
+      leadsQuery.data,
+      searchQuery,
+      selectedAssignedTo,
+      selectedLeadType,
+      selectedSource,
+      selectedStage,
+    ],
   );
 
   const sortedLeads = useMemo(() => {
@@ -236,7 +265,7 @@ export default function LeadsPage() {
       </div>
 
       <div className="flex flex-wrap items-center gap-4">
-        <div className="relative min-w-[280px] flex-1">
+        <div className="relative w-full min-w-[240px] lg:w-[320px] xl:w-[360px]">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Search by name, email, company, or phone..."
@@ -245,6 +274,32 @@ export default function LeadsPage() {
             onChange={(event) => setSearchQuery(event.target.value)}
           />
         </div>
+        <Select value={selectedAssignedTo} onValueChange={setSelectedAssignedTo}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="All Sales People" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Sales People</SelectItem>
+            {salesUsers.map((user) => (
+              <SelectItem key={user.id} value={user.id}>
+                {user.fullName}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={selectedLeadType} onValueChange={setSelectedLeadType}>
+          <SelectTrigger className="w-[170px]">
+            <SelectValue placeholder="All Lead Types" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Lead Types</SelectItem>
+            {leadTypeOptions.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Select value={selectedStage} onValueChange={setSelectedStage}>
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="All Stages" />
