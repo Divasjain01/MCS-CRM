@@ -66,8 +66,13 @@ export default function LeadsPage() {
   const leadsQuery = useLeadsQuery(users);
   const createLeadMutation = useCreateLeadMutation();
   const updateLeadMutation = useUpdateLeadMutation();
-  const salesUsers = useMemo(
-    () => users.filter((user) => user.isActive && user.role === "sales"),
+  const assigneeFilterUsers = useMemo(
+    () =>
+      users.filter(
+        (user) =>
+          user.isActive &&
+          (user.role === "sales" || user.role === "furniture_specialist"),
+      ),
     [users],
   );
 
@@ -276,11 +281,11 @@ export default function LeadsPage() {
         </div>
         <Select value={selectedAssignedTo} onValueChange={setSelectedAssignedTo}>
           <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="All Sales People" />
+            <SelectValue placeholder="All Assignees" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Sales People</SelectItem>
-            {salesUsers.map((user) => (
+            <SelectItem value="all">All Assignees</SelectItem>
+            {assigneeFilterUsers.map((user) => (
               <SelectItem key={user.id} value={user.id}>
                 {user.fullName}
               </SelectItem>
