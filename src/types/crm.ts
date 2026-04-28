@@ -240,6 +240,7 @@ export interface DashboardSourcePoint {
   source: LeadSource;
   label: string;
   count: number;
+  percentage: number;
   fill: string;
 }
 

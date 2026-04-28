@@ -37,6 +37,23 @@ export const sourceLabels: Record<LeadSource, string> = {
   manual: "Manual Entry",
 };
 
+export const inactiveLeadSources = new Set<LeadSource>(["shopify"]);
+
+export const sourceChartColors: Record<LeadSource, string> = {
+  shopify: "#2F855A",
+  meta: "#2563EB",
+  instagram: "#DB2777",
+  whatsapp: "#059669",
+  bni: "#7C3AED",
+  jbn: "#4F46E5",
+  indiamart: "#0284C7",
+  justdial: "#EA580C",
+  referral: "#D97706",
+  walk_in: "#475569",
+  website: "#0891B2",
+  manual: "#78716C",
+};
+
 export const leadTypeLabels: Record<LeadType, string> = {
   homeowner: "Homeowner",
   architect: "Architect",
@@ -91,7 +108,7 @@ export const leadStageOptions = Object.entries(stageLabels)
 export const leadSourceOptions = Object.entries(sourceLabels).map(([value, label]) => ({
   value: value as LeadSource,
   label,
-})).filter((option) => option.value !== "shopify");
+})).filter((option) => !inactiveLeadSources.has(option.value));
 
 export const leadTypeOptions = Object.entries(leadTypeLabels).map(([value, label]) => ({
   value: value as LeadType,

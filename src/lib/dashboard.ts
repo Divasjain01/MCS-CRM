@@ -1,4 +1,4 @@
-import { sourceLabels } from "@/lib/crm-config";
+import { inactiveLeadSources, sourceChartColors, sourceLabels } from "@/lib/crm-config";
 import type {
   DashboardMetrics,
   DashboardSnapshot,
@@ -8,14 +8,6 @@ import type {
   LeadStage,
   LeadSource,
 } from "@/types/crm";
-
-const CHART_COLORS = [
-  "hsl(var(--chart-1))",
-  "hsl(var(--chart-2))",
-  "hsl(var(--chart-3))",
-  "hsl(var(--chart-4))",
-  "hsl(var(--chart-5))",
-];
 
 const CONNECTED_STAGES = new Set<LeadStage>([
   "connected",
@@ -104,16 +96,23 @@ const buildLeadsBySource = (leads: Lead[], start: Date, end: Date): DashboardSou
       return;
     }
 
+    if (inactiveLeadSources.has(lead.source)) {
+      return;
+    }
+
     counts.set(lead.source, (counts.get(lead.source) ?? 0) + 1);
   });
 
+  const total = Array.from(counts.values()).reduce((sum, count) => sum + count, 0);
+
   return Array.from(counts.entries())
     .sort((left, right) => right[1] - left[1])
-    .map(([source, count], index) => ({
+    .map(([source, count]) => ({
       source,
       label: sourceLabels[source],
       count,
-      fill: CHART_COLORS[index % CHART_COLORS.length],
+      percentage: total > 0 ? Number(((count / total) * 100).toFixed(1)) : 0,
+      fill: sourceChartColors[source],
     }));
 };
 

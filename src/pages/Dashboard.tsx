@@ -39,7 +39,7 @@ import {
 import { useLeadsQuery, useOpenFollowUpsQuery } from "@/hooks/use-leads";
 import { useUsersQuery } from "@/hooks/use-users";
 import { exportLeadsToCsv } from "@/services/leads";
-import type { FollowUp, Lead, UserSummary } from "@/types/crm";
+import type { DashboardSourcePoint, FollowUp, Lead, UserSummary } from "@/types/crm";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -57,6 +57,40 @@ const itemVariants = {
 const EMPTY_USERS: UserSummary[] = [];
 const EMPTY_LEADS: Lead[] = [];
 const EMPTY_FOLLOW_UPS: FollowUp[] = [];
+
+const renderSourceTooltip = ({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: Array<{ payload?: DashboardSourcePoint }>;
+}) => {
+  const point = payload?.[0]?.payload;
+
+  if (!active || !point) {
+    return null;
+  }
+
+  return (
+    <div className="min-w-[180px] rounded-xl border border-border bg-card px-3 py-2 shadow-lg">
+      <div className="flex items-center gap-2">
+        <span
+          className="h-2.5 w-2.5 rounded-full"
+          style={{ backgroundColor: point.fill }}
+        />
+        <p className="text-sm font-semibold text-foreground">{point.label}</p>
+      </div>
+      <div className="mt-2 flex items-center justify-between gap-6 text-sm">
+        <span className="text-muted-foreground">Leads</span>
+        <span className="font-medium text-foreground">{point.count}</span>
+      </div>
+      <div className="mt-1 flex items-center justify-between gap-6 text-sm">
+        <span className="text-muted-foreground">Share</span>
+        <span className="font-medium text-foreground">{point.percentage.toFixed(1)}%</span>
+      </div>
+    </div>
+  );
+};
 
 export default function DashboardPage() {
   const { profile } = useAuth();
@@ -224,18 +258,23 @@ export default function DashboardPage() {
                 <PieChart>
                   <Pie
                     data={dashboardSnapshot.leadsBySource}
-                    cx="50%"
+                    cx="46%"
                     cy="50%"
-                    innerRadius={50}
-                    outerRadius={80}
-                    paddingAngle={4}
+                    innerRadius={52}
+                    outerRadius={82}
+                    paddingAngle={3}
                     dataKey="count"
+                    stroke="hsl(var(--background))"
+                    strokeWidth={2}
                   >
-                    {dashboardSnapshot.leadsBySource.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                    {dashboardSnapshot.leadsBySource.map((entry) => (
+                      <Cell key={entry.source} fill={entry.fill} />
                     ))}
                   </Pie>
-                  <Tooltip />
+                  <Tooltip
+                    cursor={false}
+                    content={renderSourceTooltip}
+                  />
                 </PieChart>
               </ResponsiveContainer>
             </div>
@@ -244,12 +283,19 @@ export default function DashboardPage() {
                 No source data is available for the current 30-day window.
               </p>
             ) : (
-              <div className="mt-4 grid grid-cols-2 gap-2">
+              <div className="mt-4 space-y-2">
                 {dashboardSnapshot.leadsBySource.map((item) => (
-                  <div key={item.source} className="flex items-center gap-2 text-sm">
-                    <div className="h-3 w-3 rounded-full" style={{ backgroundColor: item.fill }} />
-                    <span className="text-muted-foreground">{item.label}</span>
-                    <span className="ml-auto font-medium">{item.count}</span>
+                  <div
+                    key={item.source}
+                    className="flex items-center gap-3 rounded-lg border border-border/70 bg-muted/20 px-3 py-2 text-sm"
+                  >
+                    <div
+                      className="h-3 w-3 rounded-full ring-2 ring-background"
+                      style={{ backgroundColor: item.fill }}
+                    />
+                    <span className="min-w-0 flex-1 truncate text-foreground">{item.label}</span>
+                    <span className="text-muted-foreground">{item.percentage.toFixed(1)}%</span>
+                    <span className="font-semibold text-foreground">{item.count}</span>
                   </div>
                 ))}
               </div>
