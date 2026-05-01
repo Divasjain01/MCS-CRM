@@ -54,6 +54,16 @@ import {
 import { exportLeadsToCsv } from "@/services/leads";
 import type { Lead, LeadFormValues, UserRole } from "@/types/crm";
 
+const formatLeadValue = (lead: Lead) => {
+  const value = lead.quotationValue ?? lead.budget;
+
+  if (value == null) {
+    return "—";
+  }
+
+  return `Rs. ${value.toLocaleString("en-IN")}`;
+};
+
 export default function LeadsPage() {
   const { authUser, profile } = useAuth();
   const usersQuery = useUsersQuery();
@@ -368,6 +378,7 @@ export default function LeadsPage() {
                 <th className="min-w-[130px]">Source</th>
                 <th className="min-w-[140px]">Stage</th>
                 <th className="min-w-[150px]">Assigned To</th>
+                <th className="min-w-[130px]">Value</th>
                 <th className="min-w-[120px]">
                   <button
                     onClick={() => toggleSort("createdAt")}
@@ -383,19 +394,19 @@ export default function LeadsPage() {
             <tbody>
               {leadsQuery.isLoading ? (
                 <tr>
-                  <td colSpan={8} className="py-10 text-center text-muted-foreground">
+                  <td colSpan={9} className="py-10 text-center text-muted-foreground">
                     Loading leads...
                   </td>
                 </tr>
               ) : leadsQuery.isError ? (
                 <tr>
-                  <td colSpan={8} className="py-10 text-center text-destructive">
+                  <td colSpan={9} className="py-10 text-center text-destructive">
                     Unable to load leads. Check the Supabase schema and permissions.
                   </td>
                 </tr>
               ) : sortedLeads.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-10 text-center text-muted-foreground">
+                  <td colSpan={9} className="py-10 text-center text-muted-foreground">
                     No leads match the current filters.
                   </td>
                 </tr>
@@ -453,6 +464,9 @@ export default function LeadsPage() {
                       ) : (
                         <span className="text-sm text-muted-foreground">Unassigned</span>
                       )}
+                    </td>
+                    <td>
+                      <span className="text-sm text-foreground">{formatLeadValue(lead)}</span>
                     </td>
                     <td>
                       <span className="text-sm text-muted-foreground">
