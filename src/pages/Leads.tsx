@@ -92,7 +92,7 @@ export default function LeadsPage() {
   const [selectedAssignedTo, setSelectedAssignedTo] = useState<string>("all");
   const [selectedLeadType, setSelectedLeadType] = useState<string>("all");
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
-  const [sortField, setSortField] = useState<keyof Lead>("updatedAt");
+  const [sortField, setSortField] = useState<keyof Lead>("createdAt");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [dialogOpen, setDialogOpen] = useState(() => {
     if (typeof window === "undefined") {
