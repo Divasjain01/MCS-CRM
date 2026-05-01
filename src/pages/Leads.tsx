@@ -433,6 +433,11 @@ export default function LeadsPage() {
                           <p className="text-sm font-medium transition-colors hover:text-primary">
                             {lead.fullName}
                           </p>
+                          {lead.source === "referral" && lead.sourceDetail ? (
+                            <p className="text-xs text-muted-foreground">
+                              Referral: {lead.sourceDetail}
+                            </p>
+                          ) : null}
                           <p className="text-xs text-muted-foreground">
                             {lead.companyName || lead.phone}
                           </p>
