@@ -92,7 +92,7 @@ export default function LeadsPage() {
   const [selectedAssignedTo, setSelectedAssignedTo] = useState<string>("all");
   const [selectedLeadType, setSelectedLeadType] = useState<string>("all");
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
-  const [sortField, setSortField] = useState<keyof Lead>("createdAt");
+  const [sortField, setSortField] = useState<keyof Lead>("updatedAt");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [dialogOpen, setDialogOpen] = useState(() => {
     if (typeof window === "undefined") {
@@ -388,25 +388,34 @@ export default function LeadsPage() {
                     <ArrowUpDown className="h-3.5 w-3.5" />
                   </button>
                 </th>
+                <th className="min-w-[120px]">
+                  <button
+                    onClick={() => toggleSort("updatedAt")}
+                    className="flex items-center gap-1 hover:text-foreground"
+                  >
+                    Updated
+                    <ArrowUpDown className="h-3.5 w-3.5" />
+                  </button>
+                </th>
                 <th className="w-10" />
               </tr>
             </thead>
             <tbody>
               {leadsQuery.isLoading ? (
                 <tr>
-                  <td colSpan={9} className="py-10 text-center text-muted-foreground">
+                  <td colSpan={10} className="py-10 text-center text-muted-foreground">
                     Loading leads...
                   </td>
                 </tr>
               ) : leadsQuery.isError ? (
                 <tr>
-                  <td colSpan={9} className="py-10 text-center text-destructive">
+                  <td colSpan={10} className="py-10 text-center text-destructive">
                     Unable to load leads. Check the Supabase schema and permissions.
                   </td>
                 </tr>
               ) : sortedLeads.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-10 text-center text-muted-foreground">
+                  <td colSpan={10} className="py-10 text-center text-muted-foreground">
                     No leads match the current filters.
                   </td>
                 </tr>
@@ -476,6 +485,11 @@ export default function LeadsPage() {
                     <td>
                       <span className="text-sm text-muted-foreground">
                         {new Date(lead.createdAt).toLocaleDateString()}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="text-sm text-muted-foreground">
+                        {new Date(lead.updatedAt).toLocaleDateString()}
                       </span>
                     </td>
                     <td>
