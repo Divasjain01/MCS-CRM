@@ -124,6 +124,8 @@ interface LeadFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   assignableUsers: UserSummary[];
+  assignmentLocked?: boolean;
+  forcedAssignedTo?: string | null;
   isSubmitting?: boolean;
   onSubmit: (values: LeadFormValues) => Promise<void>;
 }
@@ -168,16 +170,25 @@ export function LeadFormDialog({
   open,
   onOpenChange,
   assignableUsers,
+  assignmentLocked = false,
+  forcedAssignedTo,
   isSubmitting = false,
   onSubmit,
 }: LeadFormDialogProps) {
   const initialValues = useMemo(() => {
-    if (lead) {
-      return mapLeadToFormValues(lead);
+    const baseValues = lead
+      ? mapLeadToFormValues(lead)
+      : readCreateLeadDraft() ?? defaultValues;
+
+    if (assignmentLocked && forcedAssignedTo) {
+      return {
+        ...baseValues,
+        assignedTo: forcedAssignedTo,
+      };
     }
 
-    return readCreateLeadDraft() ?? defaultValues;
-  }, [lead]);
+    return baseValues;
+  }, [assignmentLocked, forcedAssignedTo, lead]);
 
   const form = useForm<LeadFormValues>({
     resolver: zodResolver(leadFormSchema),
@@ -189,8 +200,17 @@ export function LeadFormDialog({
       return;
     }
 
-    form.reset(lead ? mapLeadToFormValues(lead) : readCreateLeadDraft() ?? defaultValues);
-  }, [form, lead, open]);
+    const baseValues = lead ? mapLeadToFormValues(lead) : readCreateLeadDraft() ?? defaultValues;
+
+    form.reset(
+      assignmentLocked && forcedAssignedTo
+        ? {
+            ...baseValues,
+            assignedTo: forcedAssignedTo,
+          }
+        : baseValues,
+    );
+  }, [assignmentLocked, forcedAssignedTo, form, lead, open]);
 
   useEffect(() => {
     if (!open || lead) {
@@ -201,17 +221,35 @@ export function LeadFormDialog({
       writeCreateLeadDraft({
         ...defaultValues,
         ...values,
+        ...(assignmentLocked && forcedAssignedTo
+          ? { assignedTo: forcedAssignedTo }
+          : {}),
       } as LeadFormValues);
     });
 
     return () => subscription.unsubscribe();
-  }, [form, lead, open]);
+  }, [assignmentLocked, forcedAssignedTo, form, lead, open]);
 
   const submit = form.handleSubmit(async (values) => {
-    await onSubmit(values);
+    const nextValues =
+      assignmentLocked && forcedAssignedTo
+        ? {
+            ...values,
+            assignedTo: forcedAssignedTo,
+          }
+        : values;
+
+    await onSubmit(nextValues);
     if (!lead) {
       clearCreateLeadDraft();
-      form.reset(defaultValues);
+      form.reset(
+        assignmentLocked && forcedAssignedTo
+          ? {
+              ...defaultValues,
+              assignedTo: forcedAssignedTo,
+            }
+          : defaultValues,
+      );
     }
   });
 
@@ -345,6 +383,7 @@ export function LeadFormDialog({
             <div className="space-y-2">
               <Label>Assigned to</Label>
               <Select
+                disabled={assignmentLocked}
                 value={form.watch("assignedTo") || "unassigned"}
                 onValueChange={(value) =>
                   form.setValue("assignedTo", value === "unassigned" ? "" : value, {
@@ -356,12 +395,12 @@ export function LeadFormDialog({
                   <SelectValue placeholder="Select team member" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="unassigned">Unassigned</SelectItem>
+                  {!assignmentLocked && <SelectItem value="unassigned">Unassigned</SelectItem>}
                   {assignableUsers.map((user) => (
-                      <SelectItem key={user.id} value={user.id}>
-                        {user.fullName}
-                      </SelectItem>
-                    ))}
+                    <SelectItem key={user.id} value={user.id}>
+                      {user.fullName}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

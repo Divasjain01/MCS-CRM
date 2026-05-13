@@ -70,8 +70,8 @@ export default function LeadsPage() {
   const users = usersQuery.data ?? [];
   const actorRole = (profile?.role as UserRole | undefined) ?? null;
   const assignableUsers = useMemo(
-    () => getAssignableUsers(users, actorRole ?? undefined),
-    [actorRole, users],
+    () => getAssignableUsers(users, actorRole ?? undefined, authUser?.id ?? null),
+    [actorRole, authUser?.id, users],
   );
   const leadsQuery = useLeadsQuery(users);
   const createLeadMutation = useCreateLeadMutation();
@@ -540,6 +540,8 @@ export default function LeadsPage() {
           }
         }}
         assignableUsers={assignableUsers}
+        assignmentLocked={actorRole === "sales"}
+        forcedAssignedTo={actorRole === "sales" ? authUser?.id ?? null : null}
         isSubmitting={createLeadMutation.isPending || updateLeadMutation.isPending}
         onSubmit={handleSubmit}
       />

@@ -11,6 +11,7 @@ const buildUserLookup = (users: UserSummary[]) =>
 
 const assertAssignableFollowUpUser = (
   assignedTo: string | null | undefined,
+  actorId: string | null,
   actorRole: UserRole | null,
   users: UserSummary[],
 ) => {
@@ -28,8 +29,8 @@ const assertAssignableFollowUpUser = (
     throw new Error("The selected follow-up assignee is inactive.");
   }
 
-  if (actorRole === "sales" && assignee.role !== "sales") {
-    throw new Error("Sales users can only assign follow-ups to active sales profiles.");
+  if (actorRole === "sales" && assignedTo !== actorId) {
+    throw new Error("Sales users can only assign follow-ups to themselves.");
   }
 };
 
@@ -115,7 +116,7 @@ export const createFollowUp = async (
   users: UserSummary[] = [],
 ): Promise<FollowUp> => {
   const payload = mapFollowUpFormValuesToInsert(values, leadId, actorId);
-  assertAssignableFollowUpUser(payload.assigned_to, actorRole, users);
+  assertAssignableFollowUpUser(payload.assigned_to, actorId, actorRole, users);
   const { data, error } = await supabase
     .from("follow_ups")
     .insert(payload)

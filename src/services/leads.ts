@@ -107,6 +107,7 @@ const buildAssignedLookup = (users: UserSummary[]) =>
 
 const assertAssignableUser = (
   assignedTo: string | null | undefined,
+  actorId: string | null,
   actorRole: UserRole | null,
   users: UserSummary[],
 ) => {
@@ -124,8 +125,8 @@ const assertAssignableUser = (
     throw new Error("The selected assignee is inactive.");
   }
 
-  if (actorRole === "sales" && assignee.role !== "sales") {
-    throw new Error("Sales users can only assign leads to active sales profiles.");
+  if (actorRole === "sales" && assignedTo !== actorId) {
+    throw new Error("Sales users can only assign leads to themselves.");
   }
 };
 
@@ -174,7 +175,7 @@ export const createLead = async (
   users: UserSummary[] = [],
 ): Promise<Lead> => {
   const payload = mapLeadFormValuesToInsert(values, actorId);
-  assertAssignableUser(payload.assigned_to, actorRole, users);
+  assertAssignableUser(payload.assigned_to, actorId, actorRole, users);
   payload.phone = normalizeLeadPhone(payload.phone) ?? payload.phone;
   if (payload.alternate_phone) {
     payload.alternate_phone =
@@ -246,7 +247,7 @@ export const updateLead = async (
     payload.alternate_phone =
       normalizeLeadPhone(payload.alternate_phone) ?? payload.alternate_phone;
   }
-  assertAssignableUser(payload.assigned_to, actorRole, users);
+  assertAssignableUser(payload.assigned_to, actorId, actorRole, users);
 
   if (payload.phone) {
     const existingLead = await findExistingLeadByPhone(payload.phone, leadId);
@@ -365,7 +366,7 @@ export const updateLeadAssignment = async (
   actorRole: UserRole | null,
   users: UserSummary[] = [],
 ): Promise<void> => {
-  assertAssignableUser(assignedTo, actorRole, users);
+  assertAssignableUser(assignedTo, actorId, actorRole, users);
   const { error } = await supabase
     .from("leads")
     .update({

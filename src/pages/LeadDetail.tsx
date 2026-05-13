@@ -92,8 +92,8 @@ export default function LeadDetailPage() {
   const users = usersQuery.data ?? [];
   const actorRole = profile?.role ?? null;
   const assignableUsers = useMemo(
-    () => getAssignableUsers(users, actorRole ?? undefined),
-    [actorRole, users],
+    () => getAssignableUsers(users, actorRole ?? undefined, authUser?.id ?? null),
+    [actorRole, authUser?.id, users],
   );
   const leadQuery = useLeadDetailQuery(id, users);
   const activitiesQuery = useLeadActivitiesQuery(id, users);
@@ -598,22 +598,28 @@ export default function LeadDetailPage() {
               </div>
               <div>
                 <label className="mb-2 block text-sm font-medium">Assigned To</label>
-                <Select
-                  value={lead.assignedTo ?? "unassigned"}
-                  onValueChange={handleAssignmentChange}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select team member" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="unassigned">Unassigned</SelectItem>
-                    {assignableUsers.map((user) => (
+                {actorRole === "sales" ? (
+                  <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-foreground">
+                    {lead.assignedUser?.fullName ?? profile?.fullName ?? "Assigned to you"}
+                  </div>
+                ) : (
+                  <Select
+                    value={lead.assignedTo ?? "unassigned"}
+                    onValueChange={handleAssignmentChange}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select team member" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="unassigned">Unassigned</SelectItem>
+                      {assignableUsers.map((user) => (
                         <SelectItem key={user.id} value={user.id}>
                           {user.fullName}
                         </SelectItem>
                       ))}
-                  </SelectContent>
-                </Select>
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
               <Separator />
               <Button className="w-full gap-2" onClick={() => setFollowUpDialogOpen(true)}>
@@ -762,6 +768,8 @@ export default function LeadDetailPage() {
         open={editDialogOpen}
         onOpenChange={setEditDialogOpen}
         assignableUsers={assignableUsers}
+        assignmentLocked={actorRole === "sales"}
+        forcedAssignedTo={actorRole === "sales" ? authUser?.id ?? null : null}
         isSubmitting={updateLeadMutation.isPending}
         onSubmit={handleEditSubmit}
       />
@@ -770,7 +778,7 @@ export default function LeadDetailPage() {
         open={followUpDialogOpen}
         onOpenChange={setFollowUpDialogOpen}
         assignableUsers={assignableUsers}
-        defaultAssignedTo={lead.assignedTo}
+        defaultAssignedTo={authUser?.id ?? lead.assignedTo}
         isSubmitting={createFollowUpMutation.isPending}
         onSubmit={handleCreateFollowUp}
       />

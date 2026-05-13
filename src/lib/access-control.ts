@@ -3,6 +3,7 @@ import type { UserRole, UserSummary } from "@/types/crm";
 export const getAssignableUsers = (
   users: UserSummary[],
   actorRole: UserRole | undefined,
+  actorId?: string | null,
 ) =>
   users.filter((user) => {
     if (!user.isActive) {
@@ -10,9 +11,8 @@ export const getAssignableUsers = (
     }
 
     if (actorRole === "sales") {
-      return user.role === "sales";
+      return user.id === actorId;
     }
 
     return true;
   });
-
