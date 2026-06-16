@@ -32,7 +32,7 @@ type LeadActivityRow = Database["public"]["Tables"]["lead_activities"]["Row"];
 type ExistingLeadLookup = Pick<LeadRow, "id" | "full_name" | "phone">;
 
 const selectLeadColumns =
-  "id, full_name, email, phone, alternate_phone, company_name, lead_type, source, source_detail, stage, assigned_to, project_location, city, requirement_summary, product_interest, showroom_visit_status, showroom_visit_date, quotation_required, quotation_value, budget, priority, notes_summary, next_follow_up_at, last_contacted_at, lost_reason, created_by, created_at, updated_at";
+  "id, enquiry_reference, full_name, email, phone, alternate_phone, company_name, lead_type, source, source_detail, stage, assigned_to, project_location, city, requirement_summary, product_interest, showroom_visit_status, showroom_visit_date, quotation_required, quotation_value, budget, priority, notes_summary, next_follow_up_at, last_contacted_at, lost_reason, created_by, created_at, updated_at";
 
 const formatSupabaseError = (error: PostgrestError) => {
   const parts = [error.message, error.details, error.hint].filter(Boolean);
@@ -48,6 +48,14 @@ const isDuplicateLeadPhoneError = (error: PostgrestError) =>
 const formatLeadMutationError = (error: PostgrestError) => {
   if (isDuplicateLeadPhoneError(error)) {
     return new Error("A lead with this phone number already exists.");
+  }
+
+  if (
+    error.code === "23505" &&
+    ((error.message ?? "").includes("idx_leads_enquiry_reference_unique") ||
+      (error.details ?? "").includes("enquiry_reference"))
+  ) {
+    return new Error("This enquiry reference already exists.");
   }
 
   return formatSupabaseError(error);
@@ -487,6 +495,7 @@ export const exportLeadsToCsv = (leads: Lead[]) =>
   toCsv(
     leads.map((lead) => ({
       "Full Name": lead.fullName,
+      "Enquiry Reference": lead.enquiryReference ?? "",
       Email: lead.email ?? "",
       Phone: lead.phone,
       "Alternate Phone": lead.alternatePhone ?? "",

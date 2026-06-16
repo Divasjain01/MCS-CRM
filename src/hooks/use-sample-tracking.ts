@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import {
-  createSampleDispatch,
+  createSampleDispatches,
   getSampleDispatchById,
   listSampleDispatchActivities,
   listSampleDispatches,
@@ -69,7 +69,7 @@ export const useCreateSampleDispatchMutation = () => {
       actorId: string | null;
       actorRole: UserRole | null;
       users: UserSummary[];
-    }) => createSampleDispatch(values, actorId, actorRole, users),
+    }) => createSampleDispatches(values, actorId, actorRole, users),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.sampleDispatches });
     },

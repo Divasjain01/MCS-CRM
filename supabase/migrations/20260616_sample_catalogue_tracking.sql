@@ -44,6 +44,7 @@ create table if not exists public.sample_dispatches (
   material_name text not null,
   quantity integer not null default 1 check (quantity > 0),
   category text,
+  amount_collected numeric(12,2),
   remarks text,
   assigned_to uuid references public.profiles(id) on delete set null,
   dispatch_method public.sample_dispatch_method not null default 'handed_over',
@@ -95,6 +96,9 @@ on public.sample_dispatches(customer_name);
 
 create index if not exists idx_sample_dispatches_material_name
 on public.sample_dispatches(material_name);
+
+alter table public.sample_dispatches
+add column if not exists amount_collected numeric(12,2);
 
 create index if not exists idx_sample_dispatch_activities_dispatch_id
 on public.sample_dispatch_activities(sample_dispatch_id);

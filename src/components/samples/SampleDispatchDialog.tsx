@@ -1,7 +1,7 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Check, ChevronsUpDown, Link2, UserRoundX } from "lucide-react";
-import { useForm } from "react-hook-form";
+import { Check, ChevronsUpDown, Link2, Plus, Trash2, UserRoundX } from "lucide-react";
+import { useFieldArray, useForm } from "react-hook-form";
 import { z } from "zod";
 import { useSampleCustomerSuggestionsQuery } from "@/hooks/use-sample-tracking";
 import {
@@ -12,7 +12,6 @@ import {
 import { mapSampleDispatchToFormValues } from "@/lib/crm-mappers";
 import { isValidLeadPhone } from "@/lib/phone";
 import { cn } from "@/lib/utils";
-import { buildSampleEnquiryReference } from "@/services/sample-tracking";
 import type {
   CustomerSuggestion,
   SampleDispatch,
@@ -48,6 +47,20 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 
+const SAMPLE_DISPATCH_DRAFT_KEY = "sample-dispatch-draft-v2";
+
+const sampleItemSchema = z.object({
+  materialName: z.string().trim().min(2, "Sample or catalogue name is required."),
+  quantity: z
+    .string()
+    .trim()
+    .min(1, "Quantity is required.")
+    .refine((value) => {
+      const parsed = Number.parseInt(value, 10);
+      return Number.isFinite(parsed) && parsed > 0;
+    }, "Quantity must be at least 1."),
+});
+
 const sampleDispatchSchema = z.object({
   leadId: z.string(),
   enquiryReference: z.string(),
@@ -63,16 +76,17 @@ const sampleDispatchSchema = z.object({
   issuedAt: z.string().min(1, "Issue date and time is required."),
   expectedReturnAt: z.string(),
   actualReturnedAt: z.string(),
-  materialName: z.string().trim().min(2, "Sample or catalogue name is required."),
-  quantity: z
+  amountCollected: z
     .string()
     .trim()
-    .min(1, "Quantity is required.")
     .refine((value) => {
-      const parsed = Number.parseInt(value, 10);
-      return Number.isFinite(parsed) && parsed > 0;
-    }, "Quantity must be at least 1."),
-  category: z.string(),
+      if (!value) {
+        return true;
+      }
+
+      const parsed = Number(value);
+      return Number.isFinite(parsed) && parsed >= 0;
+    }, "Amount collected must be a valid number."),
   remarks: z.string(),
   assignedTo: z.string(),
   dispatchMethod: z.enum(["handed_over", "courier", "pickup", "showroom_visit", "other"]),
@@ -84,6 +98,7 @@ const sampleDispatchSchema = z.object({
     "lost",
     "completed",
   ]),
+  sampleItems: z.array(sampleItemSchema).min(1, "Add at least one sample item."),
 });
 
 const createDefaultValues = (forcedAssignedTo?: string | null): SampleDispatchFormValues => ({
@@ -97,14 +112,34 @@ const createDefaultValues = (forcedAssignedTo?: string | null): SampleDispatchFo
     .slice(0, 16),
   expectedReturnAt: "",
   actualReturnedAt: "",
-  materialName: "",
-  quantity: "1",
-  category: "",
+  amountCollected: "",
   remarks: "",
   assignedTo: forcedAssignedTo ?? "",
   dispatchMethod: "handed_over",
   returnStatus: "with_customer",
+  sampleItems: [{ materialName: "", quantity: "1" }],
 });
+
+const normalizeDraftValues = (
+  values: Partial<SampleDispatchFormValues>,
+  forcedAssignedTo?: string | null,
+): SampleDispatchFormValues => {
+  const defaults = createDefaultValues(forcedAssignedTo);
+  const sampleItems =
+    values.sampleItems && values.sampleItems.length > 0
+      ? values.sampleItems.map((item) => ({
+          materialName: item.materialName ?? "",
+          quantity: item.quantity ?? "1",
+        }))
+      : defaults.sampleItems;
+
+  return {
+    ...defaults,
+    ...values,
+    assignedTo: forcedAssignedTo ?? values.assignedTo ?? defaults.assignedTo,
+    sampleItems,
+  };
+};
 
 interface SampleDispatchDialogProps {
   dispatch?: SampleDispatch | null;
@@ -127,24 +162,18 @@ export function SampleDispatchDialog({
   isSubmitting = false,
   onSubmit,
 }: SampleDispatchDialogProps) {
-  const initialValues = useMemo(() => {
-    const baseValues = dispatch
-      ? mapSampleDispatchToFormValues(dispatch)
-      : createDefaultValues(forcedAssignedTo);
-
-    if (assignmentLocked && forcedAssignedTo) {
-      return {
-        ...baseValues,
-        assignedTo: forcedAssignedTo,
-      };
-    }
-
-    return baseValues;
-  }, [assignmentLocked, dispatch, forcedAssignedTo]);
-
   const form = useForm<SampleDispatchFormValues>({
     resolver: zodResolver(sampleDispatchSchema),
-    defaultValues: initialValues,
+    defaultValues: createDefaultValues(forcedAssignedTo),
+  });
+
+  const {
+    fields: sampleItemFields,
+    append,
+    remove,
+  } = useFieldArray({
+    control: form.control,
+    name: "sampleItems",
   });
 
   const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
@@ -153,60 +182,73 @@ export function SampleDispatchDialog({
   const suggestionsQuery = useSampleCustomerSuggestionsQuery(deferredSearchText);
   const selectedLeadId = form.watch("leadId");
 
-  const selectedSuggestion = useMemo(() => {
-    const matchedSuggestion =
-      (suggestionsQuery.data ?? []).find((item) => item.leadId === selectedLeadId) ?? null;
-
-    if (matchedSuggestion) {
-      return matchedSuggestion;
-    }
-
-    if (!selectedLeadId) {
-      return null;
-    }
-
-    const customerName = form.getValues("customerName");
-    const customerPhone = form.getValues("customerPhone");
-
-    if (!customerName || !customerPhone) {
-      return null;
-    }
-
-    return {
-      leadId: selectedLeadId,
-      enquiryReference:
-        form.getValues("enquiryReference") || buildSampleEnquiryReference(selectedLeadId),
-      customerName,
-      customerPhone,
-      companyName: form.getValues("companyName") || null,
-      assignedTo: form.getValues("assignedTo") || null,
-    };
-  }, [form, selectedLeadId, suggestionsQuery.data]);
+  const selectedSuggestion = useMemo(
+    () => (suggestionsQuery.data ?? []).find((item) => item.leadId === selectedLeadId) ?? null,
+    [selectedLeadId, suggestionsQuery.data],
+  );
 
   useEffect(() => {
     if (!open) {
       return;
     }
 
-    const baseValues = dispatch
-      ? mapSampleDispatchToFormValues(dispatch)
-      : createDefaultValues(forcedAssignedTo);
-
-    form.reset(
-      assignmentLocked && forcedAssignedTo
-        ? {
+    const nextValues = (() => {
+      if (dispatch) {
+        const baseValues = mapSampleDispatchToFormValues(dispatch);
+        if (assignmentLocked && forcedAssignedTo) {
+          return {
             ...baseValues,
             assignedTo: forcedAssignedTo,
+          };
+        }
+
+        return baseValues;
+      }
+
+      if (typeof window !== "undefined") {
+        const storedDraft = window.localStorage.getItem(SAMPLE_DISPATCH_DRAFT_KEY);
+        if (storedDraft) {
+          try {
+            return normalizeDraftValues(
+              JSON.parse(storedDraft) as Partial<SampleDispatchFormValues>,
+              forcedAssignedTo,
+            );
+          } catch {
+            window.localStorage.removeItem(SAMPLE_DISPATCH_DRAFT_KEY);
           }
-        : baseValues,
-    );
-    setCustomerSearchText("");
+        }
+      }
+
+      return createDefaultValues(forcedAssignedTo);
+    })();
+
+    form.reset(nextValues);
+    setCustomerSearchText(nextValues.customerName);
     setCustomerSearchOpen(false);
   }, [assignmentLocked, dispatch, forcedAssignedTo, form, open]);
 
+  useEffect(() => {
+    if (!open || dispatch) {
+      return;
+    }
+
+    const subscription = form.watch((value) => {
+      if (typeof window === "undefined") {
+        return;
+      }
+
+      window.localStorage.setItem(
+        SAMPLE_DISPATCH_DRAFT_KEY,
+        JSON.stringify(normalizeDraftValues(value as Partial<SampleDispatchFormValues>, forcedAssignedTo)),
+      );
+    });
+
+    return () => subscription.unsubscribe();
+  }, [dispatch, forcedAssignedTo, form, open]);
+
   const applySuggestion = (suggestion: CustomerSuggestion) => {
     form.setValue("leadId", suggestion.leadId, { shouldDirty: true });
-    form.setValue("enquiryReference", suggestion.enquiryReference, { shouldDirty: true });
+    form.setValue("enquiryReference", suggestion.enquiryReference ?? "", { shouldDirty: true });
     form.setValue("customerName", suggestion.customerName, { shouldDirty: true });
     form.setValue("customerPhone", suggestion.customerPhone, { shouldDirty: true });
     form.setValue("companyName", suggestion.companyName ?? "", { shouldDirty: true });
@@ -221,8 +263,18 @@ export function SampleDispatchDialog({
 
   const clearLinkedCustomer = () => {
     form.setValue("leadId", "", { shouldDirty: true });
-    form.setValue("enquiryReference", "", { shouldDirty: true });
+    setCustomerSearchText(form.getValues("customerName"));
+  };
+
+  const clearDraft = () => {
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(SAMPLE_DISPATCH_DRAFT_KEY);
+    }
+
+    const defaults = createDefaultValues(forcedAssignedTo);
+    form.reset(defaults);
     setCustomerSearchText("");
+    setCustomerSearchOpen(false);
   };
 
   const submit = form.handleSubmit(async (values) => {
@@ -235,12 +287,18 @@ export function SampleDispatchDialog({
         : values;
 
     await onSubmit(nextValues);
+
+    if (!dispatch && typeof window !== "undefined") {
+      window.localStorage.removeItem(SAMPLE_DISPATCH_DRAFT_KEY);
+    }
   });
 
   const searchButtonLabel =
     selectedSuggestion?.customerName ||
     customerSearchText ||
     "Search existing customer, phone, or company";
+
+  const enquiryReferenceValue = form.watch("enquiryReference");
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -258,24 +316,33 @@ export function SampleDispatchDialog({
               <div>
                 <h3 className="text-sm font-semibold">Link Existing Customer or Enquiry</h3>
                 <p className="text-xs text-muted-foreground">
-                  Search the current CRM first to reuse customer and lead details.
+                  Search the current CRM first to reuse customer details. If no enquiry reference
+                  exists, you can type it manually below. Even when a reference is found, you can
+                  still change it for this sample dispatch.
                 </p>
               </div>
-              {selectedLeadId ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="gap-2"
-                  onClick={clearLinkedCustomer}
-                >
-                  <UserRoundX className="h-4 w-4" />
-                  Clear Link
-                </Button>
-              ) : null}
+              <div className="flex items-center gap-2">
+                {!dispatch ? (
+                  <Button type="button" variant="ghost" size="sm" onClick={clearDraft}>
+                    Clear Draft
+                  </Button>
+                ) : null}
+                {selectedLeadId ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="gap-2"
+                    onClick={clearLinkedCustomer}
+                  >
+                    <UserRoundX className="h-4 w-4" />
+                    Clear Link
+                  </Button>
+                ) : null}
+              </div>
             </div>
 
-            <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_220px]">
+            <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_260px]">
               <Popover open={customerSearchOpen} onOpenChange={setCustomerSearchOpen}>
                 <PopoverTrigger asChild>
                   <Button
@@ -325,9 +392,15 @@ export function SampleDispatchDialog({
                                 {suggestion.customerPhone}
                                 {suggestion.companyName ? ` - ${suggestion.companyName}` : ""}
                               </p>
-                              <p className="mt-1 text-[11px] uppercase tracking-wide text-muted-foreground">
-                                {suggestion.enquiryReference}
-                              </p>
+                              {suggestion.enquiryReference ? (
+                                <p className="mt-1 text-[11px] uppercase tracking-wide text-muted-foreground">
+                                  {suggestion.enquiryReference}
+                                </p>
+                              ) : (
+                                <p className="mt-1 text-[11px] text-muted-foreground">
+                                  No saved enquiry reference
+                                </p>
+                              )}
                             </div>
                           </CommandItem>
                         ))}
@@ -339,12 +412,10 @@ export function SampleDispatchDialog({
 
               <div className="rounded-lg border bg-background px-3 py-2">
                 <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                  Enquiry Reference
+                  Enquiry Reference Status
                 </p>
                 <p className="mt-1 text-sm font-medium">
-                  {form.watch("enquiryReference") ||
-                    buildSampleEnquiryReference(form.watch("leadId")) ||
-                    "Manual entry"}
+                  {enquiryReferenceValue ? enquiryReferenceValue : "No linked reference, add manually"}
                 </p>
               </div>
             </div>
@@ -352,7 +423,8 @@ export function SampleDispatchDialog({
             {selectedSuggestion ? (
               <div className="mt-3 flex items-center gap-2 text-xs text-primary">
                 <Link2 className="h-3.5 w-3.5" />
-                Linked to existing CRM lead for {selectedSuggestion.customerName}
+                Linked to existing CRM customer record for {selectedSuggestion.customerName}. The
+                enquiry reference below stays editable for this dispatch.
               </div>
             ) : null}
           </div>
@@ -360,7 +432,15 @@ export function SampleDispatchDialog({
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="sample-enquiry-reference">Enquiry reference number</Label>
-              <Input id="sample-enquiry-reference" {...form.register("enquiryReference")} />
+              <Input
+                id="sample-enquiry-reference"
+                placeholder="Enter manually if applicable"
+                {...form.register("enquiryReference")}
+              />
+              <p className="text-xs text-muted-foreground">
+                This can be different from the linked customer&apos;s enquiry reference for this
+                particular sample issue.
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="sample-issued-at">Date issued</Label>
@@ -415,27 +495,18 @@ export function SampleDispatchDialog({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="sample-material-name">Sample / catalogue name</Label>
-              <Input id="sample-material-name" {...form.register("materialName")} />
-              <p className="text-xs text-destructive">
-                {form.formState.errors.materialName?.message}
-              </p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="sample-quantity">Quantity issued</Label>
-              <Input id="sample-quantity" type="number" min="1" {...form.register("quantity")} />
-              <p className="text-xs text-destructive">
-                {form.formState.errors.quantity?.message}
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="sample-category">Category or type</Label>
+              <Label htmlFor="sample-amount-collected">Amount collected</Label>
               <Input
-                id="sample-category"
-                placeholder="e.g. Swatch, brochure, finish board"
-                {...form.register("category")}
+                id="sample-amount-collected"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="Optional"
+                {...form.register("amountCollected")}
               />
+              <p className="text-xs text-destructive">
+                {form.formState.errors.amountCollected?.message}
+              </p>
             </div>
             <div className="space-y-2">
               <Label>Dispatch method</Label>
@@ -502,16 +573,85 @@ export function SampleDispatchDialog({
                 Use this when the material is returned, consumed, or fully closed out.
               </p>
             </div>
+          </div>
 
-            <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="sample-remarks">Remarks or notes</Label>
-              <Textarea
-                id="sample-remarks"
-                rows={4}
-                placeholder={`Examples: ${sampleReturnStatusLabels[form.watch("returnStatus")].toLowerCase()} status notes, courier details, finish comments`}
-                {...form.register("remarks")}
-              />
+          <div className="space-y-4 rounded-xl border p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold">Samples / Catalogues</h3>
+                <p className="text-xs text-muted-foreground">
+                  Add one or more issued items with their respective quantities.
+                </p>
+              </div>
+              {!dispatch ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  onClick={() => append({ materialName: "", quantity: "1" })}
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Sample
+                </Button>
+              ) : null}
             </div>
+
+            <div className="space-y-3">
+              {sampleItemFields.map((field, index) => (
+                <div key={field.id} className="grid gap-3 rounded-lg border p-3 md:grid-cols-[minmax(0,1fr)_160px_auto]">
+                  <div className="space-y-2">
+                    <Label htmlFor={`sample-item-name-${field.id}`}>
+                      Sample / catalogue name {sampleItemFields.length > 1 ? index + 1 : ""}
+                    </Label>
+                    <Input
+                      id={`sample-item-name-${field.id}`}
+                      {...form.register(`sampleItems.${index}.materialName`)}
+                    />
+                    <p className="text-xs text-destructive">
+                      {form.formState.errors.sampleItems?.[index]?.materialName?.message}
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor={`sample-item-quantity-${field.id}`}>Quantity issued</Label>
+                    <Input
+                      id={`sample-item-quantity-${field.id}`}
+                      type="number"
+                      min="1"
+                      {...form.register(`sampleItems.${index}.quantity`)}
+                    />
+                    <p className="text-xs text-destructive">
+                      {form.formState.errors.sampleItems?.[index]?.quantity?.message}
+                    </p>
+                  </div>
+
+                  <div className="flex items-end">
+                    {!dispatch && sampleItemFields.length > 1 ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => remove(index)}
+                        aria-label={`Remove sample item ${index + 1}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="sample-remarks">Remarks or notes</Label>
+            <Textarea
+              id="sample-remarks"
+              rows={4}
+              placeholder={`Examples: ${sampleReturnStatusLabels[form.watch("returnStatus")].toLowerCase()} status notes, courier details, finish comments`}
+              {...form.register("remarks")}
+            />
           </div>
 
           <DialogFooter>

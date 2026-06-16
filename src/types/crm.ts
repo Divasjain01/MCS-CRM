@@ -145,6 +145,7 @@ export type SampleActivityType =
 
 export interface Lead {
   id: string;
+  enquiryReference: string | null;
   fullName: string;
   email: string | null;
   phone: string;
@@ -201,6 +202,7 @@ export interface FollowUp {
 }
 
 export interface LeadFormValues {
+  enquiryReference: string;
   fullName: string;
   email: string;
   phone: string;
@@ -234,7 +236,7 @@ export interface FollowUpFormValues {
 
 export interface CustomerSuggestion {
   leadId: string;
-  enquiryReference: string;
+  enquiryReference: string | null;
   customerName: string;
   customerPhone: string;
   companyName: string | null;
@@ -253,7 +255,7 @@ export interface SampleDispatch {
   actualReturnedAt: string | null;
   materialName: string;
   quantity: number;
-  category: string | null;
+  amountCollected: number | null;
   remarks: string | null;
   assignedTo: string | null;
   assignedUser?: UserSummary | null;
@@ -276,6 +278,11 @@ export interface SampleDispatchActivity {
   createdByUser?: UserSummary | null;
 }
 
+export interface SampleDispatchItemFormValues {
+  materialName: string;
+  quantity: string;
+}
+
 export interface SampleDispatchFormValues {
   leadId: string;
   enquiryReference: string;
@@ -285,13 +292,12 @@ export interface SampleDispatchFormValues {
   issuedAt: string;
   expectedReturnAt: string;
   actualReturnedAt: string;
-  materialName: string;
-  quantity: string;
-  category: string;
+  amountCollected: string;
   remarks: string;
   assignedTo: string;
   dispatchMethod: SampleDispatchMethod;
   returnStatus: SampleReturnStatus;
+  sampleItems: SampleDispatchItemFormValues[];
 }
 
 export interface SampleTrackingMetrics {

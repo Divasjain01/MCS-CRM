@@ -8,6 +8,7 @@ import type {
   LeadFormValues,
   SampleDispatch,
   SampleDispatchActivity,
+  SampleDispatchItemFormValues,
   SampleDispatchFormValues,
   UserSummary,
 } from "@/types/crm";
@@ -103,6 +104,7 @@ export const mapLeadRowToLead = (
   assignedUser?: UserSummary | null,
 ): Lead => ({
   id: row.id,
+  enquiryReference: row.enquiry_reference,
   fullName: row.full_name,
   email: row.email,
   phone: row.phone,
@@ -169,10 +171,10 @@ export const mapFollowUpRowToFollowUp = (
 });
 
 export const mapCustomerSuggestionRowToSuggestion = (
-  row: Pick<LeadRow, "id" | "full_name" | "phone" | "company_name" | "assigned_to">,
+  row: Pick<LeadRow, "id" | "enquiry_reference" | "full_name" | "phone" | "company_name" | "assigned_to">,
 ): CustomerSuggestion => ({
   leadId: row.id,
-  enquiryReference: `ENQ-${row.id.slice(0, 8).toUpperCase()}`,
+  enquiryReference: row.enquiry_reference,
   customerName: row.full_name,
   customerPhone: row.phone,
   companyName: row.company_name,
@@ -195,7 +197,7 @@ export const mapSampleDispatchRowToSampleDispatch = (
   actualReturnedAt: row.actual_returned_at,
   materialName: row.material_name,
   quantity: row.quantity,
-  category: row.category,
+  amountCollected: row.amount_collected,
   remarks: row.remarks,
   assignedTo: row.assigned_to,
   assignedUser: assignedUser ?? null,
@@ -228,6 +230,7 @@ export const mapLeadFormValuesToInsert = (
   values: LeadFormValues,
   actorId: string | null,
 ): LeadInsert => ({
+  enquiry_reference: nullableText(values.enquiryReference),
   full_name: values.fullName.trim(),
   email: nullableText(values.email),
   phone: normalizeLeadPhone(values.phone) ?? values.phone.trim(),
@@ -259,6 +262,7 @@ export const mapLeadFormValuesToInsert = (
 export const mapLeadFormValuesToUpdate = (
   values: LeadFormValues,
 ): LeadUpdate => ({
+  enquiry_reference: nullableText(values.enquiryReference),
   full_name: values.fullName.trim(),
   email: nullableText(values.email),
   phone: normalizeLeadPhone(values.phone) ?? values.phone.trim(),
@@ -287,6 +291,7 @@ export const mapLeadFormValuesToUpdate = (
 });
 
 export const mapLeadToFormValues = (lead: Lead): LeadFormValues => ({
+  enquiryReference: lead.enquiryReference ?? "",
   fullName: lead.fullName,
   email: lead.email ?? "",
   phone: lead.phone,
@@ -315,6 +320,7 @@ export const mapLeadToFormValues = (lead: Lead): LeadFormValues => ({
 export const mapSampleDispatchFormValuesToInsert = (
   values: SampleDispatchFormValues,
   actorId: string | null,
+  item?: SampleDispatchItemFormValues,
 ): SampleDispatchInsert => ({
   lead_id: nullableText(values.leadId),
   enquiry_reference: nullableText(values.enquiryReference),
@@ -324,9 +330,9 @@ export const mapSampleDispatchFormValuesToInsert = (
   issued_at: nullableDate(values.issuedAt) ?? new Date().toISOString(),
   expected_return_at: nullableDate(values.expectedReturnAt),
   actual_returned_at: nullableDate(values.actualReturnedAt),
-  material_name: values.materialName.trim(),
-  quantity: integerValue(values.quantity, 1),
-  category: nullableText(values.category),
+  material_name: item?.materialName.trim() ?? "",
+  quantity: integerValue(item?.quantity ?? "", 1),
+  amount_collected: nullableNumber(values.amountCollected),
   remarks: nullableText(values.remarks),
   assigned_to: nullableText(values.assignedTo),
   dispatch_method: values.dispatchMethod,
@@ -336,23 +342,27 @@ export const mapSampleDispatchFormValuesToInsert = (
 
 export const mapSampleDispatchFormValuesToUpdate = (
   values: SampleDispatchFormValues,
-): SampleDispatchUpdate => ({
-  lead_id: nullableText(values.leadId),
-  enquiry_reference: nullableText(values.enquiryReference),
-  customer_name: values.customerName.trim(),
-  customer_phone: normalizeLeadPhone(values.customerPhone) ?? values.customerPhone.trim(),
-  company_name: nullableText(values.companyName),
-  issued_at: nullableDate(values.issuedAt) ?? new Date().toISOString(),
-  expected_return_at: nullableDate(values.expectedReturnAt),
-  actual_returned_at: nullableDate(values.actualReturnedAt),
-  material_name: values.materialName.trim(),
-  quantity: integerValue(values.quantity, 1),
-  category: nullableText(values.category),
-  remarks: nullableText(values.remarks),
-  assigned_to: nullableText(values.assignedTo),
-  dispatch_method: values.dispatchMethod,
-  return_status: values.returnStatus,
-});
+): SampleDispatchUpdate => {
+  const primaryItem = values.sampleItems[0];
+
+  return {
+    lead_id: nullableText(values.leadId),
+    enquiry_reference: nullableText(values.enquiryReference),
+    customer_name: values.customerName.trim(),
+    customer_phone: normalizeLeadPhone(values.customerPhone) ?? values.customerPhone.trim(),
+    company_name: nullableText(values.companyName),
+    issued_at: nullableDate(values.issuedAt) ?? new Date().toISOString(),
+    expected_return_at: nullableDate(values.expectedReturnAt),
+    actual_returned_at: nullableDate(values.actualReturnedAt),
+    material_name: primaryItem?.materialName.trim() ?? "",
+    quantity: integerValue(primaryItem?.quantity ?? "", 1),
+    amount_collected: nullableNumber(values.amountCollected),
+    remarks: nullableText(values.remarks),
+    assigned_to: nullableText(values.assignedTo),
+    dispatch_method: values.dispatchMethod,
+    return_status: values.returnStatus,
+  };
+};
 
 export const mapSampleDispatchToFormValues = (
   dispatch: SampleDispatch,
@@ -365,13 +375,17 @@ export const mapSampleDispatchToFormValues = (
   issuedAt: toDateTimeLocal(dispatch.issuedAt),
   expectedReturnAt: toDateTimeLocal(dispatch.expectedReturnAt),
   actualReturnedAt: toDateTimeLocal(dispatch.actualReturnedAt),
-  materialName: dispatch.materialName,
-  quantity: dispatch.quantity.toString(),
-  category: dispatch.category ?? "",
+  amountCollected: dispatch.amountCollected?.toString() ?? "",
   remarks: dispatch.remarks ?? "",
   assignedTo: dispatch.assignedTo ?? "",
   dispatchMethod: dispatch.dispatchMethod,
   returnStatus: dispatch.returnStatus,
+  sampleItems: [
+    {
+      materialName: dispatch.materialName,
+      quantity: dispatch.quantity.toString(),
+    },
+  ],
 });
 
 export const mapFollowUpFormValuesToInsert = (

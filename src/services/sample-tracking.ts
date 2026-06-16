@@ -25,7 +25,7 @@ type SampleDispatchActivityRow =
   Database["public"]["Tables"]["sample_dispatch_activities"]["Row"];
 
 const selectSampleDispatchColumns =
-  "id, lead_id, enquiry_reference, customer_name, customer_phone, company_name, issued_at, expected_return_at, actual_returned_at, material_name, quantity, category, remarks, assigned_to, dispatch_method, return_status, created_by, created_at, updated_at";
+  "id, lead_id, enquiry_reference, customer_name, customer_phone, company_name, issued_at, expected_return_at, actual_returned_at, material_name, quantity, amount_collected, remarks, assigned_to, dispatch_method, return_status, created_by, created_at, updated_at";
 
 const formatSupabaseError = (error: PostgrestError) => {
   const parts = [error.message, error.details, error.hint].filter(Boolean);
@@ -34,9 +34,6 @@ const formatSupabaseError = (error: PostgrestError) => {
 
 const buildUserLookup = (users: UserSummary[]) =>
   new Map(users.map((user) => [user.id, user] as const));
-
-export const buildSampleEnquiryReference = (leadId: string | null | undefined) =>
-  leadId ? `ENQ-${leadId.slice(0, 8).toUpperCase()}` : "";
 
 const escapeIlikeValue = (value: string) => value.replace(/[%_,]/g, " ").trim();
 
@@ -168,6 +165,7 @@ export const searchSampleCustomerSuggestions = async (
   const safeQuery = escapeIlikeValue(trimmed);
   const normalizedPhone = normalizeLeadPhone(trimmed);
   const filters = [
+    `enquiry_reference.ilike.%${safeQuery}%`,
     `full_name.ilike.%${safeQuery}%`,
     `company_name.ilike.%${safeQuery}%`,
     `phone.ilike.%${safeQuery}%`,
@@ -179,7 +177,7 @@ export const searchSampleCustomerSuggestions = async (
 
   const { data, error } = await supabase
     .from("leads")
-    .select("id, full_name, phone, company_name, assigned_to")
+    .select("id, enquiry_reference, full_name, phone, company_name, assigned_to")
     .or(filters.join(","))
     .order("updated_at", { ascending: false })
     .limit(8);
@@ -190,48 +188,63 @@ export const searchSampleCustomerSuggestions = async (
 
   return (data as Pick<
     LeadRow,
-    "id" | "full_name" | "phone" | "company_name" | "assigned_to"
+    "id" | "enquiry_reference" | "full_name" | "phone" | "company_name" | "assigned_to"
   >[]).map(mapCustomerSuggestionRowToSuggestion);
 };
 
-export const createSampleDispatch = async (
+export const createSampleDispatches = async (
   values: SampleDispatchFormValues,
   actorId: string | null,
   actorRole: UserRole | null,
   users: UserSummary[] = [],
-): Promise<SampleDispatch> => {
-  const payload = mapSampleDispatchFormValuesToInsert(values, actorId);
-  assertAssignableStaff(payload.assigned_to, actorId, actorRole, users);
+): Promise<SampleDispatch[]> => {
+  const payloads = values.sampleItems.map((item) =>
+    mapSampleDispatchFormValuesToInsert(values, actorId, item),
+  );
+
+  if (payloads.length === 0) {
+    throw new Error("Add at least one sample or catalogue item.");
+  }
+
+  payloads.forEach((payload) =>
+    assertAssignableStaff(payload.assigned_to, actorId, actorRole, users),
+  );
 
   const { data, error } = await supabase
     .from("sample_dispatches")
-    .insert(payload)
-    .select(selectSampleDispatchColumns)
-    .single();
+    .insert(payloads)
+    .select(selectSampleDispatchColumns);
 
   if (error) {
     throw formatSupabaseError(error);
   }
 
-  const created = data as SampleDispatchRow;
+  const createdRows = data as SampleDispatchRow[];
   const userLookup = buildUserLookup(users);
 
-  await logSampleDispatchActivity(
-    created.id,
-    "dispatch_created",
-    `Issued ${created.material_name} to ${created.customer_name}`,
-    actorId,
-    {
-      quantity: created.quantity,
-      return_status: created.return_status,
-      assigned_to: created.assigned_to,
-    },
+  await Promise.all(
+    createdRows.map((created) =>
+      logSampleDispatchActivity(
+        created.id,
+        "dispatch_created",
+        `Issued ${created.material_name} to ${created.customer_name}`,
+        actorId,
+        {
+          quantity: created.quantity,
+          return_status: created.return_status,
+          assigned_to: created.assigned_to,
+          amount_collected: created.amount_collected,
+        },
+      ),
+    ),
   );
 
-  return mapSampleDispatchRowToSampleDispatch(
-    created,
-    created.assigned_to ? userLookup.get(created.assigned_to) ?? null : null,
-    created.created_by ? userLookup.get(created.created_by) ?? null : null,
+  return createdRows.map((created) =>
+    mapSampleDispatchRowToSampleDispatch(
+      created,
+      created.assigned_to ? userLookup.get(created.assigned_to) ?? null : null,
+      created.created_by ? userLookup.get(created.created_by) ?? null : null,
+    ),
   );
 };
 
@@ -272,6 +285,7 @@ export const updateSampleDispatch = async (
     {
       quantity: updated.quantity,
       assigned_to: updated.assigned_to,
+      amount_collected: updated.amount_collected,
     },
   );
 

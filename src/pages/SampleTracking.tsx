@@ -149,8 +149,7 @@ export default function SampleTrackingPage() {
           dispatch.customerName.toLowerCase().includes(normalizedQuery) ||
           dispatch.customerPhone.includes(searchQuery.trim()) ||
           dispatch.companyName?.toLowerCase().includes(normalizedQuery) ||
-          dispatch.materialName.toLowerCase().includes(normalizedQuery) ||
-          dispatch.category?.toLowerCase().includes(normalizedQuery);
+          dispatch.materialName.toLowerCase().includes(normalizedQuery);
 
         const matchesStatus =
           selectedStatus === "all" || dispatch.returnStatus === selectedStatus;
@@ -333,16 +332,20 @@ export default function SampleTrackingPage() {
         });
         setSelectedDispatchId(updated.id);
       } else {
-        const created = await createDispatchMutation.mutateAsync({
+        const createdDispatches = await createDispatchMutation.mutateAsync({
           values,
           actorId: authUser?.id ?? null,
           actorRole,
           users,
         });
+        const firstCreated = createdDispatches[0];
         toast("Dispatch created", {
-          description: `${created.materialName} has been issued to ${created.customerName}.`,
+          description:
+            createdDispatches.length === 1
+              ? `${firstCreated.materialName} has been issued to ${firstCreated.customerName}.`
+              : `${createdDispatches.length} sample records have been issued to ${firstCreated.customerName}.`,
         });
-        setSelectedDispatchId(created.id);
+        setSelectedDispatchId(firstCreated?.id ?? null);
       }
 
       setDialogOpen(false);
@@ -588,7 +591,9 @@ export default function SampleTrackingPage() {
                               <p className="text-sm font-medium">{dispatch.materialName}</p>
                               <p className="text-xs text-muted-foreground">
                                 Qty {dispatch.quantity}
-                                {dispatch.category ? ` - ${dispatch.category}` : ""}
+                                {dispatch.amountCollected !== null
+                                  ? ` - Collected Rs ${dispatch.amountCollected.toLocaleString("en-IN")}`
+                                  : ""}
                               </p>
                             </div>
                           </td>
@@ -704,6 +709,16 @@ export default function SampleTrackingPage() {
                         Quantity
                       </p>
                       <p className="mt-1 text-sm font-medium">{selectedDispatch.quantity}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                        Amount Collected
+                      </p>
+                      <p className="mt-1 text-sm font-medium">
+                        {selectedDispatch.amountCollected !== null
+                          ? `Rs ${selectedDispatch.amountCollected.toLocaleString("en-IN")}`
+                          : "-"}
+                      </p>
                     </div>
                     <div>
                       <p className="text-xs uppercase tracking-wide text-muted-foreground">

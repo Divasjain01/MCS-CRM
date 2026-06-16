@@ -36,6 +36,7 @@ export const LEAD_CREATE_DRAFT_KEY = "mcube:create-lead-draft";
 export const LEAD_CREATE_DIALOG_OPEN_KEY = "mcube:create-lead-dialog-open";
 
 const leadFormSchema = z.object({
+  enquiryReference: z.string(),
   fullName: z.string().trim().min(2, "Full name is required."),
   email: z.string().email("Enter a valid email.").or(z.literal("")),
   phone: z
@@ -94,6 +95,7 @@ const leadFormSchema = z.object({
 });
 
 const defaultValues: LeadFormValues = {
+  enquiryReference: "",
   fullName: "",
   email: "",
   phone: "",
@@ -275,6 +277,15 @@ export function LeadFormDialog({
 
         <form onSubmit={submit} className="space-y-6">
           <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="lead-enquiry-reference">Enquiry reference</Label>
+              <Input
+                id="lead-enquiry-reference"
+                placeholder="Optional but recommended"
+                {...form.register("enquiryReference")}
+              />
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="lead-full-name">Full name</Label>
               <Input id="lead-full-name" {...form.register("fullName")} />

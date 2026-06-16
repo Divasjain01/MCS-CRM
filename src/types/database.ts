@@ -63,6 +63,7 @@ export interface Database {
       leads: {
         Row: {
           id: string;
+          enquiry_reference: string | null;
           full_name: string;
           email: string | null;
           phone: string;
@@ -94,6 +95,7 @@ export interface Database {
         };
         Insert: {
           id?: string;
+          enquiry_reference?: string | null;
           full_name: string;
           email?: string | null;
           phone: string;
@@ -124,6 +126,7 @@ export interface Database {
           updated_at?: string;
         };
         Update: {
+          enquiry_reference?: string | null;
           full_name?: string;
           email?: string | null;
           phone?: string;
@@ -226,6 +229,7 @@ export interface Database {
           material_name: string;
           quantity: number;
           category: string | null;
+          amount_collected: number | null;
           remarks: string | null;
           assigned_to: string | null;
           dispatch_method: SampleDispatchMethod;
@@ -247,6 +251,7 @@ export interface Database {
           material_name: string;
           quantity?: number;
           category?: string | null;
+          amount_collected?: number | null;
           remarks?: string | null;
           assigned_to?: string | null;
           dispatch_method?: SampleDispatchMethod;
@@ -267,6 +272,7 @@ export interface Database {
           material_name?: string;
           quantity?: number;
           category?: string | null;
+          amount_collected?: number | null;
           remarks?: string | null;
           assigned_to?: string | null;
           dispatch_method?: SampleDispatchMethod;
