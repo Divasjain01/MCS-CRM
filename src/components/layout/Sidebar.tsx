@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   LogOut,
   Package,
+  PackageOpen,
   Plug,
   Settings,
   Upload,
@@ -30,6 +31,7 @@ const mainNavItems: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Leads", href: "/leads", icon: Users },
   { label: "Pipeline", href: "/leads/pipeline", icon: Kanban },
+  { label: "Samples", href: "/samples", icon: PackageOpen },
   { label: "Products", href: "/products", icon: Package },
   { label: "Imports", href: "/imports", icon: Upload },
 ];

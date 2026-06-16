@@ -19,6 +19,7 @@ import LoginPage from "@/pages/Login";
 import NotFound from "@/pages/NotFound";
 import PipelinePage from "@/pages/Pipeline";
 import ProductsPage from "@/pages/Products";
+import SampleTrackingPage from "@/pages/SampleTracking";
 import UnauthorizedPage from "@/pages/Unauthorized";
 import UpdatePasswordPage from "@/pages/UpdatePassword";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -76,6 +77,7 @@ const App = () => (
               <Route path="/leads" element={<LeadsPage />} />
               <Route path="/leads/pipeline" element={<PipelinePage />} />
               <Route path="/leads/:id" element={<LeadDetailPage />} />
+              <Route path="/samples" element={<SampleTrackingPage />} />
               <Route path="/products" element={<ProductsPage />} />
               <Route path="/imports" element={<ImportsPage />} />
               <Route

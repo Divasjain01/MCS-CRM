@@ -122,6 +122,27 @@ export type FollowUpStatus =
   | "missed"
   | "cancelled";
 
+export type SampleDispatchMethod =
+  | "handed_over"
+  | "courier"
+  | "pickup"
+  | "showroom_visit"
+  | "other";
+
+export type SampleReturnStatus =
+  | "with_customer"
+  | "awaiting_return"
+  | "returned"
+  | "consumed"
+  | "lost"
+  | "completed";
+
+export type SampleActivityType =
+  | "dispatch_created"
+  | "dispatch_updated"
+  | "status_changed"
+  | "note_added";
+
 export interface Lead {
   id: string;
   fullName: string;
@@ -209,6 +230,82 @@ export interface FollowUpFormValues {
   dueAt: string;
   note: string;
   assignedTo: string;
+}
+
+export interface CustomerSuggestion {
+  leadId: string;
+  enquiryReference: string;
+  customerName: string;
+  customerPhone: string;
+  companyName: string | null;
+  assignedTo: string | null;
+}
+
+export interface SampleDispatch {
+  id: string;
+  leadId: string | null;
+  enquiryReference: string | null;
+  customerName: string;
+  customerPhone: string;
+  companyName: string | null;
+  issuedAt: string;
+  expectedReturnAt: string | null;
+  actualReturnedAt: string | null;
+  materialName: string;
+  quantity: number;
+  category: string | null;
+  remarks: string | null;
+  assignedTo: string | null;
+  assignedUser?: UserSummary | null;
+  dispatchMethod: SampleDispatchMethod;
+  returnStatus: SampleReturnStatus;
+  createdBy: string | null;
+  createdByUser?: UserSummary | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SampleDispatchActivity {
+  id: string;
+  sampleDispatchId: string;
+  type: SampleActivityType;
+  description: string;
+  metadata?: ActivityMetadata | null;
+  createdAt: string;
+  createdBy: string | null;
+  createdByUser?: UserSummary | null;
+}
+
+export interface SampleDispatchFormValues {
+  leadId: string;
+  enquiryReference: string;
+  customerName: string;
+  customerPhone: string;
+  companyName: string;
+  issuedAt: string;
+  expectedReturnAt: string;
+  actualReturnedAt: string;
+  materialName: string;
+  quantity: string;
+  category: string;
+  remarks: string;
+  assignedTo: string;
+  dispatchMethod: SampleDispatchMethod;
+  returnStatus: SampleReturnStatus;
+}
+
+export interface SampleTrackingMetrics {
+  totalIssued: number;
+  activeWithCustomers: number;
+  returned: number;
+  overdueReturns: number;
+  mostIssuedSample: string | null;
+}
+
+export interface SampleTrackingSnapshot {
+  metrics: SampleTrackingMetrics;
+  topMaterials: Array<{ name: string; count: number }>;
+  customerHistory: Array<{ customerName: string; count: number }>;
 }
 
 export interface Product {

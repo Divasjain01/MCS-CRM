@@ -1,5 +1,8 @@
 import type {
   ActivityType,
+  SampleActivityType,
+  SampleDispatchMethod,
+  SampleReturnStatus,
   FollowUpStatus,
   LeadPriority,
   LeadSource,
@@ -207,6 +210,94 @@ export interface Database {
           status?: FollowUpStatus;
           note?: string | null;
           updated_at?: string;
+        };
+      };
+      sample_dispatches: {
+        Row: {
+          id: string;
+          lead_id: string | null;
+          enquiry_reference: string | null;
+          customer_name: string;
+          customer_phone: string;
+          company_name: string | null;
+          issued_at: string;
+          expected_return_at: string | null;
+          actual_returned_at: string | null;
+          material_name: string;
+          quantity: number;
+          category: string | null;
+          remarks: string | null;
+          assigned_to: string | null;
+          dispatch_method: SampleDispatchMethod;
+          return_status: SampleReturnStatus;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          lead_id?: string | null;
+          enquiry_reference?: string | null;
+          customer_name: string;
+          customer_phone: string;
+          company_name?: string | null;
+          issued_at?: string;
+          expected_return_at?: string | null;
+          actual_returned_at?: string | null;
+          material_name: string;
+          quantity?: number;
+          category?: string | null;
+          remarks?: string | null;
+          assigned_to?: string | null;
+          dispatch_method?: SampleDispatchMethod;
+          return_status?: SampleReturnStatus;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          lead_id?: string | null;
+          enquiry_reference?: string | null;
+          customer_name?: string;
+          customer_phone?: string;
+          company_name?: string | null;
+          issued_at?: string;
+          expected_return_at?: string | null;
+          actual_returned_at?: string | null;
+          material_name?: string;
+          quantity?: number;
+          category?: string | null;
+          remarks?: string | null;
+          assigned_to?: string | null;
+          dispatch_method?: SampleDispatchMethod;
+          return_status?: SampleReturnStatus;
+          updated_at?: string;
+        };
+      };
+      sample_dispatch_activities: {
+        Row: {
+          id: string;
+          sample_dispatch_id: string;
+          type: SampleActivityType;
+          description: string;
+          metadata: Json | null;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          sample_dispatch_id: string;
+          type: SampleActivityType;
+          description: string;
+          metadata?: Json | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          type?: SampleActivityType;
+          description?: string;
+          metadata?: Json | null;
+          created_by?: string | null;
         };
       };
       lead_assignments: {

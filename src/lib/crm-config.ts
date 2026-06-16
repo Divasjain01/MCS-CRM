@@ -5,6 +5,8 @@ import type {
   LeadStage,
   LeadType,
   ProductInterest,
+  SampleDispatchMethod,
+  SampleReturnStatus,
   ShowroomVisitStatus,
 } from "@/types/crm";
 
@@ -98,6 +100,23 @@ export const followUpStatusLabels: Record<FollowUpStatus, string> = {
   cancelled: "Cancelled",
 };
 
+export const sampleDispatchMethodLabels: Record<SampleDispatchMethod, string> = {
+  handed_over: "Handed Over",
+  courier: "Courier",
+  pickup: "Pickup",
+  showroom_visit: "Showroom Visit",
+  other: "Other",
+};
+
+export const sampleReturnStatusLabels: Record<SampleReturnStatus, string> = {
+  with_customer: "With Customer",
+  awaiting_return: "Awaiting Return",
+  returned: "Returned",
+  consumed: "Consumed",
+  lost: "Lost",
+  completed: "Completed",
+};
+
 export const leadStageOptions = Object.entries(stageLabels)
   .filter(([value]) => value !== "connected")
   .map(([value, label]) => ({
@@ -132,6 +151,20 @@ export const showroomVisitStatusOptions = Object.entries(
 export const leadPriorityOptions = Object.entries(leadPriorityLabels).map(
   ([value, label]) => ({
     value: value as LeadPriority,
+    label,
+  }),
+);
+
+export const sampleDispatchMethodOptions = Object.entries(sampleDispatchMethodLabels).map(
+  ([value, label]) => ({
+    value: value as SampleDispatchMethod,
+    label,
+  }),
+);
+
+export const sampleReturnStatusOptions = Object.entries(sampleReturnStatusLabels).map(
+  ([value, label]) => ({
+    value: value as SampleReturnStatus,
     label,
   }),
 );

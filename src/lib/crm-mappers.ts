@@ -1,10 +1,14 @@
 import type {
   ActivityMetadata,
+  CustomerSuggestion,
   FollowUp,
   FollowUpFormValues,
   Lead,
   LeadActivity,
   LeadFormValues,
+  SampleDispatch,
+  SampleDispatchActivity,
+  SampleDispatchFormValues,
   UserSummary,
 } from "@/types/crm";
 import type { Database } from "@/types/database";
@@ -15,6 +19,11 @@ type LeadInsert = Database["public"]["Tables"]["leads"]["Insert"];
 type LeadUpdate = Database["public"]["Tables"]["leads"]["Update"];
 type LeadActivityRow = Database["public"]["Tables"]["lead_activities"]["Row"];
 type FollowUpRow = Database["public"]["Tables"]["follow_ups"]["Row"];
+type SampleDispatchRow = Database["public"]["Tables"]["sample_dispatches"]["Row"];
+type SampleDispatchInsert = Database["public"]["Tables"]["sample_dispatches"]["Insert"];
+type SampleDispatchUpdate = Database["public"]["Tables"]["sample_dispatches"]["Update"];
+type SampleDispatchActivityRow =
+  Database["public"]["Tables"]["sample_dispatch_activities"]["Row"];
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
 
 const nullableText = (value: string) => {
@@ -50,6 +59,32 @@ const nullableNumber = (value: string) => {
 
   const parsed = Number(trimmed);
   return Number.isFinite(parsed) ? parsed : null;
+};
+
+const integerValue = (value: string, fallback = 1) => {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return fallback;
+  }
+
+  const parsed = Number.parseInt(trimmed, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+const toDateTimeLocal = (value: string | null) => {
+  if (!value) {
+    return "";
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return "";
+  }
+
+  const offset = parsed.getTimezoneOffset();
+  const localDate = new Date(parsed.getTime() - offset * 60_000);
+  return localDate.toISOString().slice(0, 16);
 };
 
 export const mapProfileRowToUserSummary = (profile: ProfileRow): UserSummary => ({
@@ -131,6 +166,62 @@ export const mapFollowUpRowToFollowUp = (
   createdBy: row.created_by,
   createdByUser: createdByUser ?? null,
   createdAt: row.created_at,
+});
+
+export const mapCustomerSuggestionRowToSuggestion = (
+  row: Pick<LeadRow, "id" | "full_name" | "phone" | "company_name" | "assigned_to">,
+): CustomerSuggestion => ({
+  leadId: row.id,
+  enquiryReference: `ENQ-${row.id.slice(0, 8).toUpperCase()}`,
+  customerName: row.full_name,
+  customerPhone: row.phone,
+  companyName: row.company_name,
+  assignedTo: row.assigned_to,
+});
+
+export const mapSampleDispatchRowToSampleDispatch = (
+  row: SampleDispatchRow,
+  assignedUser?: UserSummary | null,
+  createdByUser?: UserSummary | null,
+): SampleDispatch => ({
+  id: row.id,
+  leadId: row.lead_id,
+  enquiryReference: row.enquiry_reference,
+  customerName: row.customer_name,
+  customerPhone: row.customer_phone,
+  companyName: row.company_name,
+  issuedAt: row.issued_at,
+  expectedReturnAt: row.expected_return_at,
+  actualReturnedAt: row.actual_returned_at,
+  materialName: row.material_name,
+  quantity: row.quantity,
+  category: row.category,
+  remarks: row.remarks,
+  assignedTo: row.assigned_to,
+  assignedUser: assignedUser ?? null,
+  dispatchMethod: row.dispatch_method,
+  returnStatus: row.return_status,
+  createdBy: row.created_by,
+  createdByUser: createdByUser ?? null,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+});
+
+export const mapSampleDispatchActivityRowToActivity = (
+  row: SampleDispatchActivityRow,
+  createdByUser?: UserSummary | null,
+): SampleDispatchActivity => ({
+  id: row.id,
+  sampleDispatchId: row.sample_dispatch_id,
+  type: row.type,
+  description: row.description,
+  metadata:
+    row.metadata && typeof row.metadata === "object" && !Array.isArray(row.metadata)
+      ? (row.metadata as ActivityMetadata)
+      : null,
+  createdAt: row.created_at,
+  createdBy: row.created_by,
+  createdByUser: createdByUser ?? null,
 });
 
 export const mapLeadFormValuesToInsert = (
@@ -219,6 +310,68 @@ export const mapLeadToFormValues = (lead: Lead): LeadFormValues => ({
   notesSummary: lead.notesSummary ?? "",
   nextFollowUpAt: lead.nextFollowUpAt ?? "",
   lostReason: lead.lostReason ?? "",
+});
+
+export const mapSampleDispatchFormValuesToInsert = (
+  values: SampleDispatchFormValues,
+  actorId: string | null,
+): SampleDispatchInsert => ({
+  lead_id: nullableText(values.leadId),
+  enquiry_reference: nullableText(values.enquiryReference),
+  customer_name: values.customerName.trim(),
+  customer_phone: normalizeLeadPhone(values.customerPhone) ?? values.customerPhone.trim(),
+  company_name: nullableText(values.companyName),
+  issued_at: nullableDate(values.issuedAt) ?? new Date().toISOString(),
+  expected_return_at: nullableDate(values.expectedReturnAt),
+  actual_returned_at: nullableDate(values.actualReturnedAt),
+  material_name: values.materialName.trim(),
+  quantity: integerValue(values.quantity, 1),
+  category: nullableText(values.category),
+  remarks: nullableText(values.remarks),
+  assigned_to: nullableText(values.assignedTo),
+  dispatch_method: values.dispatchMethod,
+  return_status: values.returnStatus,
+  created_by: actorId,
+});
+
+export const mapSampleDispatchFormValuesToUpdate = (
+  values: SampleDispatchFormValues,
+): SampleDispatchUpdate => ({
+  lead_id: nullableText(values.leadId),
+  enquiry_reference: nullableText(values.enquiryReference),
+  customer_name: values.customerName.trim(),
+  customer_phone: normalizeLeadPhone(values.customerPhone) ?? values.customerPhone.trim(),
+  company_name: nullableText(values.companyName),
+  issued_at: nullableDate(values.issuedAt) ?? new Date().toISOString(),
+  expected_return_at: nullableDate(values.expectedReturnAt),
+  actual_returned_at: nullableDate(values.actualReturnedAt),
+  material_name: values.materialName.trim(),
+  quantity: integerValue(values.quantity, 1),
+  category: nullableText(values.category),
+  remarks: nullableText(values.remarks),
+  assigned_to: nullableText(values.assignedTo),
+  dispatch_method: values.dispatchMethod,
+  return_status: values.returnStatus,
+});
+
+export const mapSampleDispatchToFormValues = (
+  dispatch: SampleDispatch,
+): SampleDispatchFormValues => ({
+  leadId: dispatch.leadId ?? "",
+  enquiryReference: dispatch.enquiryReference ?? "",
+  customerName: dispatch.customerName,
+  customerPhone: dispatch.customerPhone,
+  companyName: dispatch.companyName ?? "",
+  issuedAt: toDateTimeLocal(dispatch.issuedAt),
+  expectedReturnAt: toDateTimeLocal(dispatch.expectedReturnAt),
+  actualReturnedAt: toDateTimeLocal(dispatch.actualReturnedAt),
+  materialName: dispatch.materialName,
+  quantity: dispatch.quantity.toString(),
+  category: dispatch.category ?? "",
+  remarks: dispatch.remarks ?? "",
+  assignedTo: dispatch.assignedTo ?? "",
+  dispatchMethod: dispatch.dispatchMethod,
+  returnStatus: dispatch.returnStatus,
 });
 
 export const mapFollowUpFormValuesToInsert = (
