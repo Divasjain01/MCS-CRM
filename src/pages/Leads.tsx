@@ -80,8 +80,9 @@ export default function LeadsPage() {
     () =>
       users.filter(
         (user) =>
-          user.isActive &&
-          (user.role === "sales" || user.role === "furniture_specialist"),
+          (user.isActive &&
+            (user.role === "sales" || user.role === "furniture_specialist")) ||
+          user.fullName.trim().toLowerCase().includes("siddhant"),
       ),
     [users],
   );
